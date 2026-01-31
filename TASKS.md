@@ -56,17 +56,18 @@
 - [x] Create Delivery model
 - [x] Create GST Report model
 
-### API Endpoints
-- [ ] Build shop API endpoints (CRUD)
-- [ ] Build product API endpoints (CRUD)
-- [ ] Build inventory API endpoints (CRUD)
-- [ ] Build customer API endpoints (CRUD)
-- [ ] Build order API endpoints (CRUD)
-- [ ] Build delivery API endpoints (CRUD)
-- [ ] Build GST report API endpoints (CRUD)
-- [ ] Implement order webhook for WhatsApp/Voice
-- [ ] Create order parser service (AI integration point)
-- [ ] Set up order status management
+### API Endpoints ✅ COMPLETE
+- [x] Build shop API endpoints (CRUD)
+- [x] Build product API endpoints (CRUD)
+- [x] Build inventory API endpoints (CRUD)
+- [x] Build customer API endpoints (CRUD)
+- [x] Build order API endpoints (CRUD)
+- [x] Build delivery API endpoints (CRUD)
+- [x] Build GST report API endpoints (CRUD)
+- [x] Add order status update endpoint
+- [x] Add delivery start/complete endpoints
+- [ ] Implement order webhook for WhatsApp/Voice (AI - Later)
+- [ ] Create order parser service (AI - Later)
 
 ---
 
@@ -202,7 +203,9 @@
 
 ## Phase 10: Demo & Documentation
 
-- [ ] Create demo data and seed script
+- [ ] Create demo data and seed script ⚡ HIGH PRIORITY
+- [ ] Connect frontend to backend API ⚡ HIGH PRIORITY
+- [ ] Test basic CRUD flows ⚡ HIGH PRIORITY
 - [ ] Prepare demo walkthrough
 - [ ] Record demo video
 - [ ] Write README documentation
