@@ -4,6 +4,9 @@
 /* Then Tailwind */
 @import "tailwindcss";
 
+/* Leaflet map styles */
+@import "leaflet/dist/leaflet.css";
+
 /* Base styles */
 html {
   color-scheme: dark;

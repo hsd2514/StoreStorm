@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Literal, Union
+from pydantic import BaseModel, Field, field_validator
+import json
 
 class OrderItem(BaseModel):
     product_id: str
@@ -17,7 +18,7 @@ class Order(BaseModel):
     order_number: str
     source: Literal['whatsapp', 'voice', 'storefront']
     raw_input: Optional[str] = None
-    items: List[Dict[str, Any]] # Or List[OrderItem] if strict
+    items: Union[List[Dict[str, Any]], str] = []  # Can be list or JSON string
     total_amount: float
     gst_amount: float
     status: Literal['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled']
@@ -29,6 +30,17 @@ class Order(BaseModel):
     notes: Optional[str] = None
     created_at: Optional[datetime] = Field(None, alias="$createdAt")
     updated_at: Optional[datetime] = Field(None, alias="$updatedAt")
+
+    @field_validator('items', mode='before')
+    @classmethod
+    def parse_items(cls, v):
+        """Parse items if it's a JSON string"""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except:
+                return []
+        return v or []
 
     class Config:
         populate_by_name = True

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import Inventory from './pages/Inventory'
 import Delivery from './pages/Delivery'
+import DeliveryPartner from './pages/DeliveryPartner'
 import GST from './pages/GST'
 import Customers from './pages/Customers'
 import Settings from './pages/Settings'
@@ -41,6 +42,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/storefront/:shopId" element={<Storefront />} />
+          <Route path="/driver" element={<DeliveryPartner />} />
           
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

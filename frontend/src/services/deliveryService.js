@@ -47,6 +47,28 @@ export const deliveryService = {
   }),
 
   /**
+   * Create a new delivery route with crate-based batching
+   */
+  createRoute: (routeData) => api('/deliveries/create-route', {
+    method: 'POST',
+    body: JSON.stringify(routeData),
+  }),
+
+  /**
+   * Update delivery status with actor validation
+   */
+  updateStatus: (id, newStatus, actor = 'shop_owner') => api(`/deliveries/${id}/status?new_status=${newStatus}&actor=${actor}`, {
+    method: 'PATCH',
+  }),
+
+  /**
+   * Update individual stop status
+   */
+  updateStopStatus: (id, stopSequence) => api(`/deliveries/${id}/stops/${stopSequence}`, {
+    method: 'PATCH',
+  }),
+
+  /**
    * Delete a delivery batch
    */
   delete: (id) => api(`/deliveries/${id}`, {
