@@ -1,34 +1,53 @@
+"""
+StoreStorm FastAPI Backend
+"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from config.settings import settings
 
-app = FastAPI(title="StoreStorm API", version="1.0.0")
+# Import routers
+from api import shops, products, inventory, customers, orders, deliveries, gst_reports
+
+app = FastAPI(
+    title="StoreStorm API",
+    description="SaaS platform for local shopkeepers with AI-powered features",
+    version="1.0.0"
+)
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite default port
+    allow_origins=settings.ALLOWED_ORIGINS.split(','),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register routers
+app.include_router(shops.router)
+app.include_router(products.router)
+app.include_router(inventory.router)
+app.include_router(customers.router)
+app.include_router(orders.router)
+app.include_router(deliveries.router)
+app.include_router(gst_reports.router)
+
+
 @app.get("/")
 async def root():
-    return {"message": "StoreStorm API is running"}
+    """API root endpoint"""
+    return {
+        "message": "Welcome to StoreStorm API",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+
 
 @app.get("/health")
-async def health():
+async def health_check():
+    """Health check endpoint"""
     return {"status": "healthy"}
 
-# TODO: Add routers
-# from api import auth, orders, products, inventory, delivery, gst, webhooks
-# app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-# app.include_router(orders.router, prefix="/api/orders", tags=["orders"])
-# app.include_router(products.router, prefix="/api/products", tags=["products"])
-# app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
-# app.include_router(delivery.router, prefix="/api/delivery", tags=["delivery"])
-# app.include_router(gst.router, prefix="/api/gst", tags=["gst"])
-# app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 if __name__ == "__main__":
     import uvicorn
