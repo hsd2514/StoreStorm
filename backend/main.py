@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
 
 # Import routers
-from api import shops, products, inventory, customers, orders, deliveries, gst_reports
+from api import shops, products, inventory, customers, orders, deliveries, gst_reports, auth
 
 app = FastAPI(
     title="StoreStorm API",
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth.router)
 app.include_router(shops.router)
 app.include_router(products.router)
 app.include_router(inventory.router)
