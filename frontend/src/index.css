@@ -43,7 +43,7 @@ body {
   color: #fafafa;
 }
 
-/* Focus ring utility */
+/* Focus ring utility - follows Web Interface Guidelines */
 .focus-ring {
   outline: none;
 }
@@ -135,3 +135,34 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Accessibility: Honor prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .animate-fade-in,
+  .shimmer,
+  .pulse-glow {
+    animation: none;
+  }
+}
+
+/* Improved focus-visible for better accessibility */
+*:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
