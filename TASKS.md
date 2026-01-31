@@ -48,13 +48,13 @@
 ## Phase 2: Backend Models & API
 
 ### Pydantic Models
-- [ ] Create Shop model
-- [ ] Create Product model
-- [ ] Create Inventory model
-- [ ] Create Customer model
-- [ ] Create Order model
-- [ ] Create Delivery model
-- [ ] Create GST Report model
+- [x] Create Shop model
+- [x] Create Product model
+- [x] Create Inventory model
+- [x] Create Customer model
+- [x] Create Order model
+- [x] Create Delivery model
+- [x] Create GST Report model
 
 ### API Endpoints
 - [ ] Build shop API endpoints (CRUD)
