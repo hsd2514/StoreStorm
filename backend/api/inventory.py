@@ -1,11 +1,12 @@
 """
 API Router for Inventory endpoints
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
 from config.appwrite import databases, DATABASE_ID
+from models.inventory import Inventory
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -19,9 +20,14 @@ async def list_inventory(
 ):
     """List inventory items with optional low stock filter"""
     try:
-        queries = []
+        from appwrite.query import Query
+        queries = [
+            Query.limit(limit),
+            Query.offset(offset)
+        ]
+        
         if shop_id:
-            queries.append(f'shop_id="{shop_id}"')
+            queries.append(Query.equal("shop_id", shop_id))
         
         result = databases.list_documents(
             database_id=DATABASE_ID,
@@ -30,11 +36,11 @@ async def list_inventory(
         )
         
         # Filter low stock items if requested
-        items = result['documents']
+        items = [Inventory(**doc) for doc in result['documents']]
         if low_stock:
             items = [
                 item for item in items 
-                if item.get('stock_quantity', 0) <= item.get('min_stock_level', 0)
+                if item.stock_quantity <= item.min_stock_level
             ]
         
         return {
@@ -45,7 +51,7 @@ async def list_inventory(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{inventory_id}", response_model=dict)
+@router.get("/{inventory_id}", response_model=Inventory)
 async def get_inventory_item(inventory_id: str):
     """Get a single inventory item by ID"""
     try:
@@ -54,31 +60,33 @@ async def get_inventory_item(inventory_id: str):
             collection_id="inventory",
             document_id=inventory_id
         )
-        return item
+        return Inventory(**item)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Inventory {inventory_id} not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_inventory_item(inventory_data: dict):
+@router.post("/", response_model=Inventory, status_code=201)
+async def create_inventory_item(inventory_data: Inventory):
     """Create a new inventory item"""
     try:
         from appwrite.id import ID
+        
+        data = inventory_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
         item = databases.create_document(
             database_id=DATABASE_ID,
             collection_id="inventory",
             document_id=ID.unique(),
-            data=inventory_data
+            data=data
         )
-        return item
+        return Inventory(**item)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{inventory_id}", response_model=dict)
+@router.patch("/{inventory_id}", response_model=Inventory)
 async def update_inventory_item(inventory_id: str, inventory_data: dict):
     """Update an inventory item"""
     try:
@@ -88,7 +96,7 @@ async def update_inventory_item(inventory_id: str, inventory_data: dict):
             document_id=inventory_id,
             data=inventory_data
         )
-        return item
+        return Inventory(**item)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Inventory {inventory_id} not found")

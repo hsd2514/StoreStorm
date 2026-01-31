@@ -4,11 +4,11 @@ from pydantic import BaseModel, Field
 
 class Inventory(BaseModel):
     id: Optional[str] = Field(None, alias="$id")
-    shopId: str
-    productId: str
-    currentStock: int
-    minStock: int
-    lastRestocked: Optional[datetime] = None
+    shop_id: str
+    product_id: str
+    stock_quantity: float
+    min_stock_level: float
+    last_restock_date: Optional[datetime] = None
     created_at: Optional[datetime] = Field(None, alias="$createdAt")
     updated_at: Optional[datetime] = Field(None, alias="$updatedAt")
 

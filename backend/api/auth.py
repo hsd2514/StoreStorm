@@ -2,12 +2,13 @@
 Authentication API Router
 Handles user registration, login, and session management using Appwrite
 """
-from fastapi import APIRouter, HTTPException, Response, Depends
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, HTTPException, Response, Depends, Header
+from pydantic import BaseModel, EmailStr 
 from appwrite.exception import AppwriteException
 from appwrite.id import ID
+from typing import Optional
 
-from config.appwrite import client, databases, DATABASE_ID
+from config.appwrite import client, databases, DATABASE_ID, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -95,40 +96,42 @@ async def register(data: RegisterRequest):
 async def login(data: LoginRequest):
     """
     Login shop owner
-    Note: For full session management, use Appwrite SDK on frontend
-    This endpoint validates credentials and returns user info
+    Validates credentials and returns user + shop info
     """
     try:
         from appwrite.services.account import Account
-        
-        # Create a new client for this user session
+        from appwrite.services.users import Users as AdminUsers
         from appwrite.client import Client
+        
+        # 1. Create a temporary client for password validation
         user_client = Client()
-        user_client.set_endpoint(client.endpoint)
-        user_client.set_project(client.project)
+        user_client.set_endpoint(APPWRITE_ENDPOINT)
+        user_client.set_project(APPWRITE_PROJECT_ID)
         
         account = Account(user_client)
         
-        # Create email session
+        # 2. Create email session (this validates the password)
         session = account.create_email_password_session(
             email=data.email,
             password=data.password
         )
         
-        # Get user details
-        user = account.get()
+        # 3. Fetch user details using ADMIN privileges (bypasses "Account" scope issues)
+        admin_users = AdminUsers(client)
+        user = admin_users.get(user_id=session['userId'])
         
-        # Get user's shop
-        shops = databases.list_documents(
+        # 4. Get user's shop using global databases service (Admin)
+        from appwrite.query import Query
+        shop_docs = databases.list_documents(
             database_id=DATABASE_ID,
             collection_id="shops",
-            queries=[f'owner_id="{user["$id"]}"']
+            queries=[Query.equal("owner_id", user["$id"])]
         )
         
-        if not shops['documents']:
+        if not shop_docs['documents']:
             raise HTTPException(status_code=404, detail="No shop found for this user")
         
-        shop = shops['documents'][0]
+        shop = shop_docs['documents'][0]
         
         return {
             "message": "Login successful",
@@ -145,41 +148,46 @@ async def login(data: LoginRequest):
             "shop": {
                 "id": shop['$id'],
                 "name": shop['name'],
-                "category": shop['category']
+                "category": shop.get('category', 'retail')
             }
         }
         
     except AppwriteException as e:
-        if "invalid credentials" in str(e).lower() or "unauthorized" in str(e).lower():
+        error_msg = str(e).lower()
+        if "invalid credentials" in error_msg or "unauthorized" in error_msg:
             raise HTTPException(status_code=401, detail="Invalid email or password")
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/logout")
-async def logout():
-    """
-    Logout user (handled on frontend via Appwrite SDK)
-    """
-    return {"message": "Logout successful"}
-
-
 @router.get("/me")
-async def get_current_user():
+async def get_current_user(
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
     """
-    Get current authenticated user
-    This requires the session cookie to be passed
+    Get current authenticated user info from session ID
     """
+    if not x_session_id:
+         raise HTTPException(status_code=401, detail="Not authenticated")
+
     try:
         from appwrite.services.account import Account
+        from appwrite.client import Client
+        from appwrite.query import Query
         
-        account = Account(client)
+        # Create a client for this specific session
+        temp_client = Client()
+        temp_client.set_endpoint(APPWRITE_ENDPOINT)
+        temp_client.set_project(APPWRITE_PROJECT_ID)
+        temp_client.set_session(x_session_id)
+        
+        account = Account(temp_client)
         user = account.get()
         
-        # Get user's shop
+        # Get user's shop using Admin service
         shops = databases.list_documents(
             database_id=DATABASE_ID,
             collection_id="shops",
-            queries=[f'owner_id="{user["$id"]}"']
+            queries=[Query.equal("owner_id", user["$id"])]
         )
         
         shop = shops['documents'][0] if shops['documents'] else None
@@ -194,4 +202,4 @@ async def get_current_user():
         }
         
     except AppwriteException as e:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Session invalid or expired")

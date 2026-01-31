@@ -1,11 +1,12 @@
 """
 API Router for Order endpoints
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
 from config.appwrite import databases, DATABASE_ID
+from models.order import Order
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -21,15 +22,20 @@ async def list_orders(
 ):
     """List orders with filtering"""
     try:
-        queries = []
+        from appwrite.query import Query
+        queries = [
+            Query.limit(limit),
+            Query.offset(offset)
+        ]
+        
         if shop_id:
-            queries.append(f'shop_id="{shop_id}"')
+            queries.append(Query.equal("shop_id", shop_id))
         if customer_id:
-            queries.append(f'customer_id="{customer_id}"')
+            queries.append(Query.equal("customer_id", customer_id))
         if status:
-            queries.append(f'status="{status}"')
+            queries.append(Query.equal("status", status))
         if source:
-            queries.append(f'source="{source}"')
+            queries.append(Query.equal("source", source))
         
         result = databases.list_documents(
             database_id=DATABASE_ID,
@@ -39,13 +45,13 @@ async def list_orders(
         
         return {
             "total": result['total'],
-            "orders": result['documents']
+            "orders": [Order(**doc) for doc in result['documents']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{order_id}", response_model=dict)
+@router.get("/{order_id}", response_model=Order)
 async def get_order(order_id: str):
     """Get a single order by ID"""
     try:
@@ -54,31 +60,34 @@ async def get_order(order_id: str):
             collection_id="orders",
             document_id=order_id
         )
-        return order
+        return Order(**order)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_order(order_data: dict):
+@router.post("/", response_model=Order, status_code=201)
+async def create_order(order_data: Order):
     """Create a new order"""
     try:
         from appwrite.id import ID
+        
+        # Exclude ID and timestamps for creation
+        data = order_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
         order = databases.create_document(
             database_id=DATABASE_ID,
             collection_id="orders",
             document_id=ID.unique(),
-            data=order_data
+            data=data
         )
-        return order
+        return Order(**order)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{order_id}", response_model=dict)
+@router.patch("/{order_id}", response_model=Order)
 async def update_order(order_id: str, order_data: dict):
     """Update an order"""
     try:
@@ -88,14 +97,14 @@ async def update_order(order_id: str, order_data: dict):
             document_id=order_id,
             data=order_data
         )
-        return order
+        return Order(**order)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{order_id}/status", response_model=dict)
+@router.patch("/{order_id}/status", response_model=Order)
 async def update_order_status(order_id: str, status: str):
     """Update order status (pending → confirmed → preparing → out_for_delivery → delivered)"""
     try:
@@ -112,7 +121,7 @@ async def update_order_status(order_id: str, status: str):
             document_id=order_id,
             data={"status": status}
         )
-        return order
+        return Order(**order)
     except HTTPException:
         raise
     except AppwriteException as e:

@@ -5,6 +5,7 @@ import {
   Package, 
   Truck, 
   FileText,
+  Users,
   Store,
   Settings,
   HelpCircle,
@@ -12,11 +13,13 @@ import {
   Zap
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useShop } from '../../context/ShopContext'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Inventory', href: '/inventory', icon: Package },
+  { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Delivery', href: '/delivery', icon: Truck },
   { name: 'GST & Compliance', href: '/gst', icon: FileText },
 ]
@@ -29,6 +32,7 @@ const secondaryNav = [
 
 export default function Sidebar() {
   const location = useLocation()
+  const { user, logout } = useShop()
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-[280px] flex flex-col glass">
@@ -114,10 +118,14 @@ export default function Sidebar() {
             S
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">Shop Owner</p>
-            <p className="text-xs text-zinc-500 truncate">demo@storestorm.io</p>
+            <p className="text-sm font-medium text-white truncate">{user?.name || 'Shop Owner'}</p>
+            <p className="text-xs text-zinc-500 truncate">{user?.email || 'demo@storestorm.io'}</p>
           </div>
           <button 
+            onClick={() => {
+              logout()
+              window.location.href = '/login'
+            }}
             className="p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-white/5"
             aria-label="Log out"
           >

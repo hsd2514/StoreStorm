@@ -8,9 +8,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Appwrite client
+APPWRITE_ENDPOINT = os.getenv('APPWRITE_ENDPOINT', 'https://cloud.appwrite.io/v1')
+APPWRITE_PROJECT_ID = os.getenv('APPWRITE_PROJECT_ID', '')
+
 client = Client()
-client.set_endpoint(os.getenv('APPWRITE_ENDPOINT', 'https://cloud.appwrite.io/v1'))
-client.set_project(os.getenv('APPWRITE_PROJECT_ID', ''))
+client.set_endpoint(APPWRITE_ENDPOINT)
+client.set_project(APPWRITE_PROJECT_ID)
 client.set_key(os.getenv('APPWRITE_API_KEY', ''))
 
 # Initialize services

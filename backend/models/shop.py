@@ -6,13 +6,13 @@ class Shop(BaseModel):
     id: Optional[str] = Field(None, alias="$id")
     name: str
     category: Literal['grocery', 'pharmacy', 'food', 'electronics']
-    ownerId: str
+    owner_id: str
     phone: str
     address: str
     latitude: float
     longitude: float
-    gstNumber: str
-    isActive: bool = True
+    gstin: Optional[str] = None
+    is_active: bool = True
     created_at: Optional[datetime] = Field(None, alias="$createdAt")
     updated_at: Optional[datetime] = Field(None, alias="$updatedAt")
 

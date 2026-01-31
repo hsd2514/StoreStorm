@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { 
   FileText,
   Download,
@@ -7,30 +8,76 @@ import {
   Calendar,
   CheckCircle,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
 import DashboardLayout from '../components/layout/DashboardLayout'
 import { cn } from '../lib/utils'
-
-const gstSummary = {
-  totalSales: 245800,
-  totalGST: 12340,
-  breakdown: [
-    { rate: '0%', amount: 45000, tax: 0, items: 12 },
-    { rate: '5%', amount: 120000, tax: 6000, items: 45 },
-    { rate: '12%', amount: 50000, tax: 6000, items: 18 },
-    { rate: '18%', amount: 25000, tax: 4500, items: 8 },
-    { rate: '28%', amount: 5800, tax: 1624, items: 3 },
-  ]
-}
-
-const recentReports = [
-  { period: 'January 2026', status: 'pending', sales: 245800, gst: 12340 },
-  { period: 'December 2025', status: 'filed', sales: 312500, gst: 15680 },
-  { period: 'November 2025', status: 'filed', sales: 289400, gst: 14520 },
-]
+import { gstReportService } from '../services/gstReportService'
+import { useShop } from '../context/ShopContext'
 
 export default function GST() {
+  const { shop } = useShop()
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    if (shop?.id) {
+      fetchReports()
+    }
+  }, [shop?.id])
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true)
+      const data = await gstReportService.list({ shop_id: shop.id })
+      setReports(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGenerateReport = async () => {
+    try {
+      setGenerating(true)
+      const now = new Date()
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      
+      await gstReportService.create({
+        shop_id: shop.id,
+        period: period,
+        total_sales: 0, // In a real app, backend would calculate this
+        total_gst: 0,
+        breakdown: {},
+        report_data: {}
+      })
+      
+      fetchReports()
+    } catch (err) {
+      alert('Failed to generate report: ' + err.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Get the latest report for simple summary
+  const latestReport = reports[0] || {
+    total_sales: 0,
+    total_gst: 0,
+    breakdown: {}
+  }
+
+  const breakdownArray = Object.entries(latestReport.breakdown || {}).map(([rate, amount]) => ({
+    rate: `${rate}%`,
+    amount: amount,
+    tax: (amount * parseFloat(rate)) / 100,
+    items: '-' // Backend doesn't store item count in summary yet
+  }))
   return (
     <DashboardLayout>
       {/* Page header */}
@@ -41,104 +88,139 @@ export default function GST() {
             Manage GST calculations and generate compliance reports
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]">
-          <Download className="w-4 h-4" aria-hidden="true" />
-          Generate Report
+        <button 
+          onClick={handleGenerateReport}
+          disabled={generating}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {generating ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" aria-hidden="true" />
+          )}
+          {generating ? 'Generating...' : 'Generate Report'}
         </button>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-500/10">
-              <IndianRupee className="w-6 h-6 text-green-400" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm text-zinc-400">Total Sales (MTD)</p>
-              <p className="text-2xl font-bold text-white flex items-center gap-1">
-                <IndianRupee className="w-5 h-5" aria-hidden="true" />
-                <span className="tabular-nums">{gstSummary.totalSales.toLocaleString()}</span>
-              </p>
-            </div>
-          </div>
+      {/* Content */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
+          <p className="text-zinc-400">Loading GST data...</p>
         </div>
-
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-cyan-500/10">
-              <TrendingUp className="w-6 h-6 text-cyan-400" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm text-zinc-400">Total GST Collected</p>
-              <p className="text-2xl font-bold text-white flex items-center gap-1">
-                <IndianRupee className="w-5 h-5" aria-hidden="true" />
-                <span className="tabular-nums">{gstSummary.totalGST.toLocaleString()}</span>
-              </p>
-            </div>
-          </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-20 glass rounded-2xl border border-red-500/20">
+          <AlertCircle className="w-10 h-10 text-red-400 mb-4" />
+          <p className="text-white font-medium">Failed to load GST reports</p>
+          <p className="text-zinc-400 text-sm mt-1">{error}</p>
+          <button 
+            onClick={fetchReports}
+            className="mt-6 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors"
+          >
+            Try Again
+          </button>
         </div>
-
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-purple-500/10">
-              <Calendar className="w-6 h-6 text-purple-400" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm text-zinc-400">Next Filing Due</p>
-              <p className="text-2xl font-bold text-white">Feb 20</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* GST Breakdown */}
-        <div className="lg:col-span-2 glass rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-purple-400" aria-hidden="true" />
-              GST Breakdown by Slab
-            </h2>
-            <span className="text-sm text-zinc-500">January 2026</span>
-          </div>
-
-          <div className="space-y-4">
-            {gstSummary.breakdown.map((slab) => {
-              const percentage = (slab.amount / gstSummary.totalSales) * 100
-              return (
-                <div key={slab.rate} className="p-4 bg-white/5 rounded-xl">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="px-3 py-1 text-sm font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg">
-                        {slab.rate}
-                      </span>
-                      <span className="text-sm text-zinc-400">{slab.items} items</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-white flex items-center gap-1">
-                        <IndianRupee className="w-3 h-3" aria-hidden="true" />
-                        <span className="tabular-nums">{slab.tax.toLocaleString()}</span>
-                        <span className="text-zinc-500">tax</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-zinc-500 tabular-nums w-12">
-                      {percentage.toFixed(1)}%
-                    </span>
-                  </div>
+      ) : (
+        <>
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-500/10">
+                  <IndianRupee className="w-6 h-6 text-green-400" aria-hidden="true" />
                 </div>
-              )
-            })}
+                <div>
+                  <p className="text-sm text-zinc-400">Total Sales ({latestReport.period || 'MTD'})</p>
+                  <p className="text-2xl font-bold text-white flex items-center gap-1">
+                    <IndianRupee className="w-5 h-5" aria-hidden="true" />
+                    <span className="tabular-nums">{latestReport.total_sales.toLocaleString()}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-cyan-500/10">
+                  <TrendingUp className="w-6 h-6 text-cyan-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-sm text-zinc-400">Total GST Collected</p>
+                  <p className="text-2xl font-bold text-white flex items-center gap-1">
+                    <IndianRupee className="w-5 h-5" aria-hidden="true" />
+                    <span className="tabular-nums">{latestReport.total_gst.toLocaleString()}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass rounded-2xl p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-purple-500/10">
+                  <Calendar className="w-6 h-6 text-purple-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-sm text-zinc-400">Last Generated</p>
+                  <p className="text-2xl font-bold text-white">
+                    {latestReport.generated_at ? new Date(latestReport.generated_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'None'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* GST Breakdown */}
+            <div className="lg:col-span-2 glass rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <PieChart className="w-5 h-5 text-purple-400" aria-hidden="true" />
+                  GST Breakdown by Slab
+                </h2>
+                <span className="text-sm text-zinc-500">{latestReport.period}</span>
+              </div>
+
+              <div className="space-y-4">
+                {breakdownArray.length === 0 ? (
+                  <p className="text-zinc-500 text-center py-8">No breakdown data available for this period.</p>
+                ) : (
+                  breakdownArray.map((slab) => {
+                    const percentage = latestReport.total_sales > 0 
+                      ? (slab.amount / latestReport.total_sales) * 100 
+                      : 0
+                    return (
+                      <div key={slab.rate} className="p-4 bg-white/5 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="px-3 py-1 text-sm font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg">
+                              {slab.rate}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-white flex items-center gap-1">
+                              <IndianRupee className="w-3 h-3" aria-hidden="true" />
+                              <span className="tabular-nums">{slab.tax.toLocaleString()}</span>
+                              <span className="text-zinc-500">tax</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-500 tabular-nums w-12">
+                            {percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
 
         {/* AI GST Assistant */}
         <div className="glass rounded-2xl p-6">
@@ -196,32 +278,21 @@ export default function GST() {
             <thead>
               <tr className="border-b border-white/5">
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Period</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Sales</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">GST Amount</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {recentReports.map((report) => (
-                <tr key={report.period} className="hover:bg-white/[0.02]">
+              {reports.map((report) => (
+                <tr key={report.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-4 text-sm font-medium text-white">{report.period}</td>
-                  <td className="px-4 py-4">
-                    <span className={cn(
-                      'px-2.5 py-1 text-xs font-medium rounded-full border',
-                      report.status === 'filed' 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    )}>
-                      {report.status === 'filed' ? 'Filed' : 'Pending'}
-                    </span>
-                  </td>
                   <td className="px-4 py-4 text-sm text-white flex items-center gap-1">
                     <IndianRupee className="w-3 h-3" aria-hidden="true" />
-                    <span className="tabular-nums">{report.sales.toLocaleString()}</span>
+                    <span className="tabular-nums">{report.total_sales.toLocaleString()}</span>
                   </td>
                   <td className="px-4 py-4 text-sm text-zinc-400 tabular-nums">
-                    ₹{report.gst.toLocaleString()}
+                    ₹{report.total_gst.toLocaleString()}
                   </td>
                   <td className="px-4 py-4 text-right">
                     <button className="px-3 py-1.5 text-xs font-medium text-purple-400 hover:text-white hover:bg-purple-500/10 rounded-lg transition-colors">
@@ -231,10 +302,19 @@ export default function GST() {
                   </td>
                 </tr>
               ))}
+              {reports.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="px-4 py-8 text-center text-zinc-500 text-sm">
+                    No reports found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+    </>
+    )}
     </DashboardLayout>
   )
 }

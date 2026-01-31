@@ -8,7 +8,7 @@ from config.settings import settings
 # Import routers
 from api import shops, products, inventory, customers, orders, deliveries, gst_reports, auth
 
-app = FastAPI(
+app = FastAPI( 
     title="StoreStorm API",
     description="SaaS platform for local shopkeepers with AI-powered features",
     version="1.0.0"

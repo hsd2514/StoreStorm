@@ -1,11 +1,12 @@
 """
 API Router for GST Report endpoints
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
 from config.appwrite import databases, DATABASE_ID
+from models.gst import GSTReport
 
 router = APIRouter(prefix="/gst-reports", tags=["GST Reports"])
 
@@ -20,13 +21,18 @@ async def list_gst_reports(
 ):
     """List GST reports with filtering"""
     try:
-        queries = []
+        from appwrite.query import Query
+        queries = [
+            Query.limit(limit),
+            Query.offset(offset)
+        ]
+        
         if shop_id:
-            queries.append(f'shop_id="{shop_id}"')
+            queries.append(Query.equal("shop_id", shop_id))
         if period:
-            queries.append(f'period="{period}"')
+            queries.append(Query.equal("period", period))
         if status:
-            queries.append(f'status="{status}"')
+            queries.append(Query.equal("status", status))
         
         result = databases.list_documents(
             database_id=DATABASE_ID,
@@ -36,13 +42,13 @@ async def list_gst_reports(
         
         return {
             "total": result['total'],
-            "reports": result['documents']
+            "reports": [GSTReport(**doc) for doc in result['documents']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{report_id}", response_model=dict)
+@router.get("/{report_id}", response_model=GSTReport)
 async def get_gst_report(report_id: str):
     """Get a single GST report by ID"""
     try:
@@ -51,31 +57,33 @@ async def get_gst_report(report_id: str):
             collection_id="gst_reports",
             document_id=report_id
         )
-        return report
+        return GSTReport(**report)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"GST Report {report_id} not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_gst_report(report_data: dict):
+@router.post("/", response_model=GSTReport, status_code=201)
+async def create_gst_report(report_data: GSTReport):
     """Create a new GST report"""
     try:
         from appwrite.id import ID
+        
+        data = report_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
         report = databases.create_document(
             database_id=DATABASE_ID,
             collection_id="gst_reports",
             document_id=ID.unique(),
-            data=report_data
+            data=data
         )
-        return report
+        return GSTReport(**report)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{report_id}", response_model=dict)
+@router.patch("/{report_id}", response_model=GSTReport)
 async def update_gst_report(report_id: str, report_data: dict):
     """Update a GST report"""
     try:
@@ -85,14 +93,14 @@ async def update_gst_report(report_id: str, report_data: dict):
             document_id=report_id,
             data=report_data
         )
-        return report
+        return GSTReport(**report)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"GST Report {report_id} not found")
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{report_id}/file", response_model=dict)
+@router.patch("/{report_id}/file", response_model=GSTReport)
 async def file_gst_report(report_id: str):
     """Mark a GST report as filed"""
     try:
@@ -107,7 +115,7 @@ async def file_gst_report(report_id: str):
                 "filed_at": datetime.utcnow().isoformat()
             }
         )
-        return report
+        return GSTReport(**report)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"GST Report {report_id} not found")

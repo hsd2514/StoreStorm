@@ -4,15 +4,15 @@ from pydantic import BaseModel, Field
 
 class Delivery(BaseModel):
     id: Optional[str] = Field(None, alias="$id")
-    shopId: str
-    batchNumber: str
-    orderIds: List[str]
+    shop_id: str
+    batch_number: str
+    order_ids: List[str]
     status: Literal['planned', 'in_progress', 'completed']
-    optimizedRoute: List[Dict[str, Any]] # Or specific structure
-    deliveryPersonId: Optional[str] = None
-    estimatedTime: Optional[int] = None # In minutes
-    startedAt: Optional[datetime] = None
-    completedAt: Optional[datetime] = None
+    optimized_route: List[Dict[str, Any]] # Or specific structure
+    delivery_person_id: Optional[str] = None
+    estimated_time: Optional[int] = None # In minutes
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: Optional[datetime] = Field(None, alias="$createdAt")
     updated_at: Optional[datetime] = Field(None, alias="$updatedAt")
 

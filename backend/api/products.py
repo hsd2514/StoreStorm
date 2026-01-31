@@ -1,11 +1,12 @@
 """
 API Router for Product endpoints
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
 from config.appwrite import databases, DATABASE_ID
+from models.product import Product
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -20,13 +21,18 @@ async def list_products(
 ):
     """List products with filtering"""
     try:
-        queries = []
+        from appwrite.query import Query
+        queries = [
+            Query.limit(limit),
+            Query.offset(offset)
+        ]
+        
         if shop_id:
-            queries.append(f'shop_id="{shop_id}"')
+            queries.append(Query.equal("shop_id", shop_id))
         if category:
-            queries.append(f'category="{category}"')
+            queries.append(Query.equal("category", category))
         if is_active is not None:
-            queries.append(f'is_active={str(is_active).lower()}')
+            queries.append(Query.equal("is_active", is_active))
         
         result = databases.list_documents(
             database_id=DATABASE_ID,
@@ -36,13 +42,13 @@ async def list_products(
         
         return {
             "total": result['total'],
-            "products": result['documents']
+            "products": [Product(**doc) for doc in result['documents']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{product_id}", response_model=dict)
+@router.get("/{product_id}", response_model=Product)
 async def get_product(product_id: str):
     """Get a single product by ID"""
     try:
@@ -51,31 +57,34 @@ async def get_product(product_id: str):
             collection_id="products",
             document_id=product_id
         )
-        return product
+        return Product(**product)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_product(product_data: dict):
+@router.post("/", response_model=Product, status_code=201)
+async def create_product(product_data: Product):
     """Create a new product"""
     try:
         from appwrite.id import ID
+        
+        # Exclude ID and timestamps for creation
+        data = product_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
         product = databases.create_document(
             database_id=DATABASE_ID,
             collection_id="products",
             document_id=ID.unique(),
-            data=product_data
+            data=data
         )
-        return product
+        return Product(**product)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{product_id}", response_model=dict)
+@router.patch("/{product_id}", response_model=Product)
 async def update_product(product_id: str, product_data: dict):
     """Update a product"""
     try:
@@ -85,7 +94,7 @@ async def update_product(product_id: str, product_data: dict):
             document_id=product_id,
             data=product_data
         )
-        return product
+        return Product(**product)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Product {product_id} not found")

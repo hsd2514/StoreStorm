@@ -1,11 +1,12 @@
 """
 API Router for Customer endpoints
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
 from config.appwrite import databases, DATABASE_ID
+from models.customer import Customer
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
@@ -19,11 +20,16 @@ async def list_customers(
 ):
     """List customers with filtering"""
     try:
-        queries = []
+        from appwrite.query import Query
+        queries = [
+            Query.limit(limit),
+            Query.offset(offset)
+        ]
+        
         if shop_id:
-            queries.append(f'shop_id="{shop_id}"')
+            queries.append(Query.equal("shop_id", shop_id))
         if phone:
-            queries.append(f'phone="{phone}"')
+            queries.append(Query.equal("phone", phone))
         
         result = databases.list_documents(
             database_id=DATABASE_ID,
@@ -33,13 +39,13 @@ async def list_customers(
         
         return {
             "total": result['total'],
-            "customers": result['documents']
+            "customers": [Customer(**doc) for doc in result['documents']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{customer_id}", response_model=dict)
+@router.get("/{customer_id}", response_model=Customer)
 async def get_customer(customer_id: str):
     """Get a single customer by ID"""
     try:
@@ -48,31 +54,33 @@ async def get_customer(customer_id: str):
             collection_id="customers",
             document_id=customer_id
         )
-        return customer
+        return Customer(**customer)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_customer(customer_data: dict):
+@router.post("/", response_model=Customer, status_code=201)
+async def create_customer(customer_data: Customer):
     """Create a new customer"""
     try:
         from appwrite.id import ID
+        
+        data = customer_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
         customer = databases.create_document(
             database_id=DATABASE_ID,
             collection_id="customers",
             document_id=ID.unique(),
-            data=customer_data
+            data=data
         )
-        return customer
+        return Customer(**customer)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{customer_id}", response_model=dict)
+@router.patch("/{customer_id}", response_model=Customer)
 async def update_customer(customer_id: str, customer_data: dict):
     """Update a customer"""
     try:
@@ -82,7 +90,7 @@ async def update_customer(customer_id: str, customer_data: dict):
             document_id=customer_id,
             data=customer_data
         )
-        return customer
+        return Customer(**customer)
     except AppwriteException as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=f"Customer {customer_id} not found")

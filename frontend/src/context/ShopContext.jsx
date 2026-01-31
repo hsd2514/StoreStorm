@@ -23,11 +23,14 @@ export function ShopProvider({ children }) {
     setLoading(false)
   }, [])
 
-  const login = (userData, shopData) => {
+  const login = (userData, shopData, sessionId) => {
     setUser(userData)
     setShop(shopData)
     localStorage.setItem('user', JSON.stringify(userData))
     localStorage.setItem('shop', JSON.stringify(shopData))
+    if (sessionId) {
+      localStorage.setItem('sessionId', sessionId)
+    }
   }
 
   const logout = () => {
@@ -36,6 +39,7 @@ export function ShopProvider({ children }) {
     localStorage.removeItem('user')
     localStorage.removeItem('shop')
     localStorage.removeItem('sessionId')
+    localStorage.removeItem('appwrite_session') // Added for safety
   }
 
   const value = {
