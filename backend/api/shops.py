@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.shop import Shop
 
 router = APIRouter(prefix="/shops", tags=["Shops"])
@@ -18,6 +18,7 @@ async def list_shops(
     owner_id: Optional[str] = None
 ):
     """List all shops with optional filtering"""
+    print(f"📡 API: list_shops called with owner_id={owner_id}")
     try:
         from appwrite.query import Query
         queries = [
@@ -28,17 +29,20 @@ async def list_shops(
         if owner_id:
             queries.append(Query.equal("owner_id", owner_id))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="shops",
+            table_id="shops",
             queries=queries
         )
         
         return {
             "total": result['total'],
-            "shops": [Shop(**doc) for doc in result['documents']]
+            "shops": [Shop(**doc) for doc in result['rows']]
         }
-    except AppwriteException as e:
+    except Exception as e:
+        print(f"❌ Error in list_shops: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -46,10 +50,10 @@ async def list_shops(
 async def get_shop(shop_id: str):
     """Get a single shop by ID"""
     try:
-        shop = databases.get_document(
+        shop = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="shops",
-            document_id=shop_id
+            table_id="shops",
+            row_id=shop_id
         )
         return Shop(**shop)
     except AppwriteException as e:
@@ -66,10 +70,10 @@ async def create_shop(shop_data: Shop):
         
         data = shop_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        shop = databases.create_document(
+        shop = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="shops",
-            document_id=ID.unique(),
+            table_id="shops",
+            row_id=ID.unique(),
             data=data
         )
         return Shop(**shop)
@@ -81,10 +85,10 @@ async def create_shop(shop_data: Shop):
 async def update_shop(shop_id: str, shop_data: dict):
     """Update a shop"""
     try:
-        shop = databases.update_document(
+        shop = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="shops",
-            document_id=shop_id,
+            table_id="shops",
+            row_id=shop_id,
             data=shop_data
         )
         return Shop(**shop)
@@ -98,10 +102,10 @@ async def update_shop(shop_id: str, shop_data: dict):
 async def delete_shop(shop_id: str):
     """Delete a shop"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="shops",
-            document_id=shop_id
+            table_id="shops",
+            row_id=shop_id
         )
         return None
     except AppwriteException as e:

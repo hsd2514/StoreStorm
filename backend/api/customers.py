@@ -5,7 +5,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.customer import Customer
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
@@ -31,15 +31,15 @@ async def list_customers(
         if phone:
             queries.append(Query.equal("phone", phone))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="customers",
+            table_id="customers",
             queries=queries
         )
         
         return {
             "total": result['total'],
-            "customers": [Customer(**doc) for doc in result['documents']]
+            "customers": [Customer(**doc) for doc in result['rows']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -49,10 +49,10 @@ async def list_customers(
 async def get_customer(customer_id: str):
     """Get a single customer by ID"""
     try:
-        customer = databases.get_document(
+        customer = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="customers",
-            document_id=customer_id
+            table_id="customers",
+            row_id=customer_id
         )
         return Customer(**customer)
     except AppwriteException as e:
@@ -69,10 +69,10 @@ async def create_customer(customer_data: Customer):
         
         data = customer_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        customer = databases.create_document(
+        customer = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="customers",
-            document_id=ID.unique(),
+            table_id="customers",
+            row_id=ID.unique(),
             data=data
         )
         return Customer(**customer)
@@ -84,10 +84,10 @@ async def create_customer(customer_data: Customer):
 async def update_customer(customer_id: str, customer_data: dict):
     """Update a customer"""
     try:
-        customer = databases.update_document(
+        customer = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="customers",
-            document_id=customer_id,
+            table_id="customers",
+            row_id=customer_id,
             data=customer_data
         )
         return Customer(**customer)
@@ -101,10 +101,10 @@ async def update_customer(customer_id: str, customer_data: dict):
 async def delete_customer(customer_id: str):
     """Delete a customer"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="customers",
-            document_id=customer_id
+            table_id="customers",
+            row_id=customer_id
         )
         return None
     except AppwriteException as e:

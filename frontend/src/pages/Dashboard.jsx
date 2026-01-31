@@ -20,6 +20,7 @@ import Button from '../components/ui/Button'
 import { cn } from '../lib/utils'
 import { orderService } from '../services/orderService'
 import { productService } from '../services/productService'
+import { aiService } from '../services/aiService'
 import { useShop } from '../context/ShopContext'
 
 export default function Dashboard() {
@@ -35,6 +36,8 @@ export default function Dashboard() {
     revenue: 0,
     gst: 0
   })
+  const [aiInsights, setAiInsights] = useState([])
+  const [loadingInsights, setLoadingInsights] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -42,21 +45,21 @@ export default function Dashboard() {
 
       try {
         setLoading(true)
-        const fetchedOrders = await orderService.list({ shop_id: shop.id, limit: 10 })
+        const fetchedOrders = await orderService.list({ shop_id: shop.id, limit: 10 }) || []
         setOrders(fetchedOrders)
 
-        const lowStockProducts = await productService.list({ shop_id: shop.id, low_stock: true })
+        const lowStockProducts = await productService.list({ shop_id: shop.id, low_stock: true }) || []
 
         const today = new Date().toISOString().split('T')[0]
         const todayOrders = fetchedOrders.filter(o => o.created_at?.startsWith(today))
         const pending = fetchedOrders.filter(o => o.status === 'pending').length
-        const revenue = fetchedOrders.reduce((sum, o) => sum + o.total_amount, 0)
-        const gst = fetchedOrders.reduce((sum, o) => sum + o.gst_amount, 0)
+        const revenue = fetchedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
+        const gst = fetchedOrders.reduce((sum, o) => sum + (o.gst_amount || 0), 0)
 
         setStatsData({
           todayOrders: todayOrders.length,
           pendingOrders: pending,
-          lowStock: lowStockProducts?.length || 0,
+          lowStock: lowStockProducts.length,
           activeDeliveries: fetchedOrders.filter(o => o.status === 'out_for_delivery').length,
           revenue,
           gst
@@ -71,6 +74,52 @@ export default function Dashboard() {
 
     fetchDashboardData()
   }, [shop?.id])
+
+  const fetchAIInsights = async () => {
+    if (!shop?.id) return
+    
+    try {
+      setLoadingInsights(true)
+      const response = await aiService.getInventoryInsights(shop.id)
+      
+      if (response && response.success && response.insights) {
+        const insights = []
+        
+        if (response.insights.alert) {
+          insights.push({
+            type: 'inventory',
+            message: response.insights.alert,
+            severity: 'high'
+          })
+        }
+        
+        if (response.insights.insight) {
+          insights.push({
+            type: 'demand',
+            message: response.insights.insight,
+            severity: 'medium'
+          })
+        }
+        
+        if (response.insights.recommendation) {
+          insights.push({
+            type: 'action',
+            message: response.insights.recommendation,
+            severity: 'low'
+          })
+        }
+        
+        setAiInsights(insights)
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI insights:', err)
+      setAiInsights([
+        { type: 'info', message: 'AI insights temporarily unavailable', severity: 'low' }
+      ])
+    } finally {
+      setLoadingInsights(false)
+    }
+  }
 
   const stats = [
     {
@@ -105,11 +154,7 @@ export default function Dashboard() {
     }
   ]
 
-  const aiInsights = [
-    { type: 'inventory', message: 'Rice stock running low – reorder 50kg today', severity: 'high' },
-    { type: 'demand', message: 'Expected 40% order surge this weekend', severity: 'medium' },
-    { type: 'delivery', message: 'Optimal delivery batch at 4 PM for MG Road area', severity: 'low' }
-  ]
+
 
   const statusVariants = {
     pending: 'warning',
@@ -152,7 +197,6 @@ export default function Dashboard() {
           <div
             key={stat.label}
             className={cn('animate-fade-in', `delay-${index + 1}`)}
-            style={{ opacity: 0 }}
           >
             <StatCard {...stat} />
           </div>
@@ -182,9 +226,9 @@ export default function Dashboard() {
                 description="Orders will appear here once customers start placing them"
               />
             ) : (
-              orders.map((order) => (
+              orders.map((order, idx) => (
                 <div
-                  key={order.id}
+                  key={order.id || order.$id || `order-${order.order_number}-${idx}`}
                   className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-500/10">
@@ -228,7 +272,34 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-3">
+            {aiInsights.length === 0 && !loadingInsights && (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                  <Sparkles className="w-6 h-6 text-zinc-500" />
+                </div>
+                <p className="text-sm text-zinc-400 mb-4">
+                  AI insights generation is parked to save costs. Click below to generate analysis on-demand.
+                </p>
+                <Button 
+                  size="sm" 
+                  variant="primary" 
+                  onClick={fetchAIInsights}
+                  className="w-full"
+                >
+                  Generate Insights
+                </Button>
+              </div>
+            )}
+            
+            {loadingInsights && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <LoadingSpinner size="sm" />
+                <p className="text-xs text-zinc-500 mt-2">AI is analyzing your data...</p>
+              </div>
+            )}
+
             {aiInsights.map((insight, index) => (
+
               <div
                 key={index}
                 className={cn(

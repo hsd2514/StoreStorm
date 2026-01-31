@@ -1,11 +1,10 @@
-"""
-API Router for GST Report endpoints
-"""
+import json
+from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.gst import GSTReport
 
 router = APIRouter(prefix="/gst-reports", tags=["GST Reports"])
@@ -34,15 +33,27 @@ async def list_gst_reports(
         if status:
             queries.append(Query.equal("status", status))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
+            table_id="gst_reports",
             queries=queries
         )
         
+        reports = []
+        for doc in result['rows']:
+            # Parse JSON strings from Appwrite
+            if isinstance(doc.get('breakdown'), str):
+                try: doc['breakdown'] = json.loads(doc['breakdown'])
+                except: doc['breakdown'] = {}
+            if isinstance(doc.get('report_data'), str):
+                try: doc['report_data'] = json.loads(doc['report_data'])
+                except: doc['report_data'] = {}
+            
+            reports.append(GSTReport(**doc))
+            
         return {
             "total": result['total'],
-            "reports": [GSTReport(**doc) for doc in result['documents']]
+            "reports": reports
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,11 +63,17 @@ async def list_gst_reports(
 async def get_gst_report(report_id: str):
     """Get a single GST report by ID"""
     try:
-        report = databases.get_document(
+        report = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
-            document_id=report_id
+            table_id="gst_reports",
+            row_id=report_id
         )
+        # Parse JSON strings
+        if isinstance(report.get('breakdown'), str):
+            report['breakdown'] = json.loads(report['breakdown'])
+        if isinstance(report.get('report_data'), str):
+            report['report_data'] = json.loads(report['report_data'])
+            
         return GSTReport(**report)
     except AppwriteException as e:
         if "not found" in str(e).lower():
@@ -72,12 +89,25 @@ async def create_gst_report(report_data: GSTReport):
         
         data = report_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        report = databases.create_document(
+        # Serialize Dict fields for Appwrite string attributes
+        if isinstance(data.get('breakdown'), dict):
+            data['breakdown'] = json.dumps(data['breakdown'])
+        if isinstance(data.get('report_data'), dict):
+            data['report_data'] = json.dumps(data['report_data'])
+            
+        report = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
-            document_id=ID.unique(),
+            table_id="gst_reports",
+            row_id=ID.unique(),
             data=data
         )
+        
+        # Return parsed
+        if isinstance(report.get('breakdown'), str):
+            report['breakdown'] = json.loads(report['breakdown'])
+        if isinstance(report.get('report_data'), str):
+            report['report_data'] = json.loads(report['report_data'])
+            
         return GSTReport(**report)
     except AppwriteException as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -87,10 +117,10 @@ async def create_gst_report(report_data: GSTReport):
 async def update_gst_report(report_id: str, report_data: dict):
     """Update a GST report"""
     try:
-        report = databases.update_document(
+        report = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
-            document_id=report_id,
+            table_id="gst_reports",
+            row_id=report_id,
             data=report_data
         )
         return GSTReport(**report)
@@ -106,10 +136,10 @@ async def file_gst_report(report_id: str):
     try:
         from datetime import datetime
         
-        report = databases.update_document(
+        report = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
-            document_id=report_id,
+            table_id="gst_reports",
+            row_id=report_id,
             data={
                 "status": "filed",
                 "filed_at": datetime.utcnow().isoformat()
@@ -126,10 +156,10 @@ async def file_gst_report(report_id: str):
 async def delete_gst_report(report_id: str):
     """Delete a GST report"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="gst_reports",
-            document_id=report_id
+            table_id="gst_reports",
+            row_id=report_id
         )
         return None
     except AppwriteException as e:

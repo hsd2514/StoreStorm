@@ -6,7 +6,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.delivery import Delivery, Crate, DeliveryStop, DeliveryPartner
 from utils.routing import nearest_neighbor_route, calculate_total_distance, estimate_delivery_time
 
@@ -33,15 +33,15 @@ async def list_deliveries(
         if status:
             queries.append(Query.equal("status", status))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
+            table_id="deliveries",
             queries=queries
         )
         
         return {
             "total": result['total'],
-            "deliveries": [Delivery(**doc) for doc in result['documents']]
+            "deliveries": [Delivery(**doc) for doc in result['rows']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -51,10 +51,10 @@ async def list_deliveries(
 async def get_delivery(delivery_id: str):
     """Get a single delivery batch by ID"""
     try:
-        delivery = databases.get_document(
+        delivery = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id
+            table_id="deliveries",
+            row_id=delivery_id
         )
         return Delivery(**delivery)
     except AppwriteException as e:
@@ -71,10 +71,10 @@ async def create_delivery_batch(delivery_data: Delivery):
         
         data = delivery_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        delivery = databases.create_document(
+        delivery = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=ID.unique(),
+            table_id="deliveries",
+            row_id=ID.unique(),
             data=data
         )
         return Delivery(**delivery)
@@ -86,10 +86,10 @@ async def create_delivery_batch(delivery_data: Delivery):
 async def update_delivery(delivery_id: str, delivery_data: dict):
     """Update a delivery batch"""
     try:
-        delivery = databases.update_document(
+        delivery = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id,
+            table_id="deliveries",
+            row_id=delivery_id,
             data=delivery_data
         )
         return Delivery(**delivery)
@@ -105,10 +105,10 @@ async def start_delivery(delivery_id: str):
     try:
         from datetime import datetime
         
-        delivery = databases.update_document(
+        delivery = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id,
+            table_id="deliveries",
+            row_id=delivery_id,
             data={
                 "status": "in_progress",
                 "started_at": datetime.utcnow().isoformat()
@@ -127,10 +127,10 @@ async def complete_delivery(delivery_id: str):
     try:
         from datetime import datetime
         
-        delivery = databases.update_document(
+        delivery = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id,
+            table_id="deliveries",
+            row_id=delivery_id,
             data={
                 "status": "completed",
                 "completed_at": datetime.utcnow().isoformat()
@@ -156,16 +156,16 @@ async def create_route(
         from appwrite.query import Query as AppwriteQuery
         
         # Fetch orders to get customer addresses
-        orders_result = databases.list_documents(
+        orders_result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="orders",
+            table_id="orders",
             queries=[
                 AppwriteQuery.equal("$id", order_ids),
                 AppwriteQuery.limit(len(order_ids))
             ]
         )
         
-        orders = orders_result['documents']
+        orders = orders_result['rows']
         if not orders:
             raise HTTPException(status_code=400, detail="No valid orders found")
         
@@ -238,10 +238,10 @@ async def create_route(
         if delivery_partner:
             delivery_data['delivery_partner'] = delivery_partner
         
-        delivery = databases.create_document(
+        delivery = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=ID.unique(),
+            table_id="deliveries",
+            row_id=ID.unique(),
             data=delivery_data
         )
         
@@ -268,10 +268,10 @@ async def update_delivery_status(
     
     try:
         # Get current delivery
-        delivery = databases.get_document(
+        delivery = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id
+            table_id="deliveries",
+            row_id=delivery_id
         )
         
         current_status = delivery.get('status')
@@ -307,10 +307,10 @@ async def update_delivery_status(
             from datetime import datetime
             update_data['completed_at'] = datetime.utcnow().isoformat()
         
-        updated = databases.update_document(
+        updated = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id,
+            table_id="deliveries",
+            row_id=delivery_id,
             data=update_data
         )
         
@@ -325,10 +325,10 @@ async def update_delivery_status(
 async def update_stop_status(delivery_id: str, stop_sequence: int):
     """Mark a stop as delivered and advance current pointer"""
     try:
-        delivery = databases.get_document(
+        delivery = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id
+            table_id="deliveries",
+            row_id=delivery_id
         )
         
         route_stops = delivery.get('route_stops', [])
@@ -340,10 +340,10 @@ async def update_stop_status(delivery_id: str, stop_sequence: int):
             elif stop['sequence'] == stop_sequence + 1:
                 stop['status'] = 'current'
         
-        updated = databases.update_document(
+        updated = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id,
+            table_id="deliveries",
+            row_id=delivery_id,
             data={'route_stops': route_stops}
         )
         
@@ -358,10 +358,10 @@ async def update_stop_status(delivery_id: str, stop_sequence: int):
 async def delete_delivery(delivery_id: str):
     """Delete a delivery batch"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="deliveries",
-            document_id=delivery_id
+            table_id="deliveries",
+            row_id=delivery_id
         )
         return None
     except AppwriteException as e:

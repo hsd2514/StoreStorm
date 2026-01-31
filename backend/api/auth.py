@@ -8,7 +8,7 @@ from appwrite.exception import AppwriteException
 from appwrite.id import ID
 from typing import Optional
 
-from config.appwrite import client, databases, DATABASE_ID, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID
+from config.appwrite import client, tables_db, DATABASE_ID, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -58,10 +58,10 @@ async def register(data: RegisterRequest):
         )
         
         # Create shop for this user
-        shop = databases.create_document(
+        shop = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="shops",
-            document_id=ID.unique(),
+            table_id="shops",
+            row_id=ID.unique(),
             data={
                 "name": data.shop_name,
                 "owner_id": user['$id'],
@@ -120,18 +120,18 @@ async def login(data: LoginRequest):
         admin_users = AdminUsers(client)
         user = admin_users.get(user_id=session['userId'])
         
-        # 4. Get user's shop using global databases service (Admin)
+        # 4. Get user's shop using global tables_db service (Admin)
         from appwrite.query import Query
-        shop_docs = databases.list_documents(
+        shop_docs = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="shops",
+            table_id="shops",
             queries=[Query.equal("owner_id", user["$id"])]
         )
         
-        if not shop_docs['documents']:
+        if not shop_docs['rows']:
             raise HTTPException(status_code=404, detail="No shop found for this user")
         
-        shop = shop_docs['documents'][0]
+        shop = shop_docs['rows'][0]
         
         return {
             "message": "Login successful",
@@ -184,13 +184,13 @@ async def get_current_user(
         user = account.get()
         
         # Get user's shop using Admin service
-        shops = databases.list_documents(
+        shops = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="shops",
+            table_id="shops",
             queries=[Query.equal("owner_id", user["$id"])]
         )
         
-        shop = shops['documents'][0] if shops['documents'] else None
+        shop = shops['rows'][0] if shops['rows'] else None
         
         return {
             "user": {

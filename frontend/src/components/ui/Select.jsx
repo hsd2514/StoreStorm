@@ -1,26 +1,19 @@
 import { cn } from '../../lib/utils'
 import { forwardRef, useId } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 /**
- * Reusable Input component following design system
- * @param {string} label - Input label
- * @param {string} error - Error message
- * @param {string} helperText - Helper text below input
- * @param {React.ReactNode} leftIcon - Icon on the left
- * @param {React.ReactNode} rightIcon - Icon on the right
- * @param {string} className - Additional classes for input
- * @param {string} wrapperClassName - Additional classes for wrapper
+ * Reusable Select component following design system
  */
-const Input = forwardRef(({
+const Select = forwardRef(({
     label,
     error,
     helperText,
-    leftIcon,
-    rightIcon,
     className,
     wrapperClassName,
     id,
     required,
+    children,
     ...props
 }, ref) => {
     const generatedId = useId()
@@ -39,40 +32,30 @@ const Input = forwardRef(({
             )}
 
             <div className="relative">
-                {leftIcon && (
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                        {leftIcon}
-                    </div>
-                )}
-
-                <input
+                <select
                     ref={ref}
                     id={inputId}
                     required={required}
                     className={cn(
-                        'w-full px-4 py-3',
+                        'w-full px-4 py-3 appearance-none',
                         'bg-black/40',
                         'border border-white/10',
                         'hover:border-white/20',
                         'focus:border-purple-500 focus:ring-1 focus:ring-purple-500',
                         'rounded-xl',
                         'text-white',
-                        'placeholder-zinc-500',
                         'transition-colors duration-200',
                         'outline-none',
                         error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
-                        leftIcon && 'pl-11',
-                        rightIcon && 'pr-11',
                         className
                     )}
                     {...props}
-                />
-
-                {rightIcon && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                        {rightIcon}
-                    </div>
-                )}
+                >
+                    {children}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                    <ChevronDown className="w-4 h-4" />
+                </div>
             </div>
 
             {error && (
@@ -90,6 +73,6 @@ const Input = forwardRef(({
     )
 })
 
-Input.displayName = 'Input'
+Select.displayName = 'Select'
 
-export default Input
+export default Select

@@ -8,7 +8,7 @@ export const orderService = {
     const queryParams = new URLSearchParams(filters).toString();
     const endpoint = `/orders/${queryParams ? `?${queryParams}` : ''}`;
     const result = await api(endpoint);
-    return result.orders;
+    return result?.orders || [];
   },
 
   /**

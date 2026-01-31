@@ -59,7 +59,7 @@ export default function Sidebar() {
               key={item.name}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-[background-color,color,border-color] duration-200',
                 isActive
                   ? 'bg-gradient-to-r from-purple-500/20 to-purple-500/5 text-white border border-purple-500/20'
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
@@ -91,7 +91,7 @@ export default function Sidebar() {
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-[background-color,color,border-color] duration-200',
                   isActive
                     ? 'bg-gradient-to-r from-purple-500/20 to-purple-500/5 text-white border border-purple-500/20'
                     : 'text-zinc-400 hover:text-white hover:bg-white/5'

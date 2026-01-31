@@ -33,8 +33,9 @@ export default function GST() {
   const fetchReports = async () => {
     try {
       setLoading(true)
-      const data = await gstReportService.list({ shop_id: shop.id })
-      setReports(data)
+      console.log('📊 Fetching GST reports for shop:', shop?.id);
+      const response = await gstReportService.list({ shop_id: shop.id })
+      setReports(response || [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -51,10 +52,9 @@ export default function GST() {
       await gstReportService.create({
         shop_id: shop.id,
         period: period,
-        total_sales: 0, // In a real app, backend would calculate this
+        total_sales: 0,
         total_gst: 0,
-        breakdown: {},
-        report_data: {}
+        breakdown: {}
       })
       
       fetchReports()
@@ -69,7 +69,8 @@ export default function GST() {
   const latestReport = reports[0] || {
     total_sales: 0,
     total_gst: 0,
-    breakdown: {}
+    breakdown: {},
+    period: 'MTD'
   }
 
   const breakdownArray = Object.entries(latestReport.breakdown || {}).map(([rate, amount]) => ({
@@ -260,8 +261,11 @@ export default function GST() {
             </p>
           </div>
 
-          <button className="w-full px-4 py-3 text-sm font-medium text-purple-400 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-xl transition-colors">
-            Ask GST Question
+          <button 
+            disabled
+            className="w-full px-4 py-3 text-sm font-medium text-zinc-500 bg-white/5 border border-white/10 rounded-xl cursor-not-allowed"
+          >
+            Assistant Offline (Parked)
           </button>
         </div>
       </div>

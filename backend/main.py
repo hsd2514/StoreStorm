@@ -1,12 +1,13 @@
 """
 StoreStorm FastAPI Backend
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
 
 # Import routers
-from api import shops, products, inventory, customers, orders, deliveries, gst_reports, auth
+from api import shops, products, inventory, customers, orders, deliveries, gst_reports, auth, ai, twilio, telegram, forecasting
 
 app = FastAPI( 
     title="StoreStorm API",
@@ -23,6 +24,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    print(f"🔥 GLOBAL ERROR: {exc}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()},
+        headers={
+            "Access-Control-Allow-Origin": "*", # Force CORS on error
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
 # Register routers
 app.include_router(auth.router)
 app.include_router(shops.router)
@@ -32,6 +47,10 @@ app.include_router(customers.router)
 app.include_router(orders.router)
 app.include_router(deliveries.router)
 app.include_router(gst_reports.router)
+app.include_router(ai.router)
+app.include_router(twilio.router)
+app.include_router(telegram.router)
+app.include_router(forecasting.router)
 
 
 @app.get("/")

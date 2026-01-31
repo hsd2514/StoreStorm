@@ -5,7 +5,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.inventory import Inventory
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -29,14 +29,14 @@ async def list_inventory(
         if shop_id:
             queries.append(Query.equal("shop_id", shop_id))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="inventory",
+            table_id="inventory",
             queries=queries
         )
         
         # Filter low stock items if requested
-        items = [Inventory(**doc) for doc in result['documents']]
+        items = [Inventory(**doc) for doc in result['rows']]
         if low_stock:
             items = [
                 item for item in items 
@@ -55,10 +55,10 @@ async def list_inventory(
 async def get_inventory_item(inventory_id: str):
     """Get a single inventory item by ID"""
     try:
-        item = databases.get_document(
+        item = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="inventory",
-            document_id=inventory_id
+            table_id="inventory",
+            row_id=inventory_id
         )
         return Inventory(**item)
     except AppwriteException as e:
@@ -75,10 +75,10 @@ async def create_inventory_item(inventory_data: Inventory):
         
         data = inventory_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        item = databases.create_document(
+        item = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="inventory",
-            document_id=ID.unique(),
+            table_id="inventory",
+            row_id=ID.unique(),
             data=data
         )
         return Inventory(**item)
@@ -90,10 +90,10 @@ async def create_inventory_item(inventory_data: Inventory):
 async def update_inventory_item(inventory_id: str, inventory_data: dict):
     """Update an inventory item"""
     try:
-        item = databases.update_document(
+        item = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="inventory",
-            document_id=inventory_id,
+            table_id="inventory",
+            row_id=inventory_id,
             data=inventory_data
         )
         return Inventory(**item)
@@ -107,10 +107,10 @@ async def update_inventory_item(inventory_id: str, inventory_data: dict):
 async def delete_inventory_item(inventory_id: str):
     """Delete an inventory item"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="inventory",
-            document_id=inventory_id
+            table_id="inventory",
+            row_id=inventory_id
         )
         return None
     except AppwriteException as e:

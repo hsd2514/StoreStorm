@@ -5,7 +5,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from appwrite.exception import AppwriteException
 
-from config.appwrite import databases, DATABASE_ID
+from config.appwrite import tables_db, DATABASE_ID
 from models.order import Order
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -37,15 +37,15 @@ async def list_orders(
         if source:
             queries.append(Query.equal("source", source))
         
-        result = databases.list_documents(
+        result = tables_db.list_rows(
             database_id=DATABASE_ID,
-            collection_id="orders",
+            table_id="orders",
             queries=queries
         )
         
         return {
             "total": result['total'],
-            "orders": [Order(**doc) for doc in result['documents']]
+            "orders": [Order(**doc) for doc in result['rows']]
         }
     except AppwriteException as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -55,10 +55,10 @@ async def list_orders(
 async def get_order(order_id: str):
     """Get a single order by ID"""
     try:
-        order = databases.get_document(
+        order = tables_db.get_row(
             database_id=DATABASE_ID,
-            collection_id="orders",
-            document_id=order_id
+            table_id="orders",
+            row_id=order_id
         )
         return Order(**order)
     except AppwriteException as e:
@@ -76,10 +76,10 @@ async def create_order(order_data: Order):
         # Exclude ID and timestamps for creation
         data = order_data.model_dump(by_alias=True, exclude={"id", "created_at", "updated_at"})
         
-        order = databases.create_document(
+        order = tables_db.create_row(
             database_id=DATABASE_ID,
-            collection_id="orders",
-            document_id=ID.unique(),
+            table_id="orders",
+            row_id=ID.unique(),
             data=data
         )
         return Order(**order)
@@ -91,10 +91,10 @@ async def create_order(order_data: Order):
 async def update_order(order_id: str, order_data: dict):
     """Update an order"""
     try:
-        order = databases.update_document(
+        order = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="orders",
-            document_id=order_id,
+            table_id="orders",
+            row_id=order_id,
             data=order_data
         )
         return Order(**order)
@@ -115,10 +115,10 @@ async def update_order_status(order_id: str, status: str):
                 detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
             )
         
-        order = databases.update_document(
+        order = tables_db.update_row(
             database_id=DATABASE_ID,
-            collection_id="orders",
-            document_id=order_id,
+            table_id="orders",
+            row_id=order_id,
             data={"status": status}
         )
         return Order(**order)
@@ -134,10 +134,10 @@ async def update_order_status(order_id: str, status: str):
 async def delete_order(order_id: str):
     """Delete an order"""
     try:
-        databases.delete_document(
+        tables_db.delete_row(
             database_id=DATABASE_ID,
-            collection_id="orders",
-            document_id=order_id
+            table_id="orders",
+            row_id=order_id
         )
         return None
     except AppwriteException as e:

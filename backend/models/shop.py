@@ -9,8 +9,8 @@ class Shop(BaseModel):
     owner_id: str
     phone: str
     address: str
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = 0.0
+    longitude: Optional[float] = 0.0
     gstin: Optional[str] = None
     is_active: bool = True
     created_at: Optional[datetime] = Field(None, alias="$createdAt")

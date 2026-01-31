@@ -11,7 +11,9 @@ import {
   Trash2,
   Edit2,
   Archive,
-  ArrowUpDown
+  ArrowUpDown,
+  Sparkles,
+  Wand2
 } from 'lucide-react'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
@@ -20,6 +22,7 @@ import { cn } from '../lib/utils'
 import { Badge, Button, Input, Modal, ModalFooter, LoadingSpinner, EmptyState, Card } from '../components/ui'
 import { productService } from '../services/productService'
 import { inventoryService } from '../services/inventoryService'
+import { aiService } from '../services/aiService'
 import { useShop } from '../context/ShopContext'
 
 const statusConfig = {
@@ -37,13 +40,22 @@ export default function Inventory() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [filterStatus, setFilterStatus] = useState('all')
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  
+  // Pagination State
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
 
   const fetchData = async () => {
     if (!shop?.id) return
     try {
       setLoading(true)
       const [fetchedProducts, fetchedInventory] = await Promise.all([
-        productService.list({ shop_id: shop.id }),
+        productService.list({ 
+          shop_id: shop.id,
+          skip: (page - 1) * limit,
+          limit: limit
+        }),
         inventoryService.list({ shop_id: shop.id })
       ])
 
@@ -148,6 +160,31 @@ export default function Inventory() {
       }
     }
   })
+
+  const handleGSTSuggest = async () => {
+    if (!formik.values.name) {
+      alert('Please enter a product name first')
+      return
+    }
+
+    try {
+      setIsSuggesting(true)
+      const result = await aiService.categorizeGST(formik.values.name, formik.values.category)
+      
+      if (result.success && result.gst_info) {
+        const { gst_rate, category, explanation } = result.gst_info
+        formik.setFieldValue('gst_rate', gst_rate)
+        if (category && !formik.values.category) {
+          formik.setFieldValue('category', category)
+        }
+        // Success feedback could be added here
+      }
+    } catch (err) {
+      console.error('GST Suggest Error:', err)
+    } finally {
+      setIsSuggesting(false)
+    }
+  }
 
   const handleEdit = (product) => {
     setEditingProduct(product)
@@ -295,66 +332,104 @@ export default function Inventory() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProducts.map(product => (
-            <Card key={product.id} variant="glass" className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
-                  <p className="text-sm text-zinc-400 capitalize">{product.category}</p>
-                </div>
-                <div className="relative group">
-                  <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                    <MoreVertical className="w-4 h-4 text-zinc-400" aria-hidden="true" />
-                  </button>
-                  <div className="absolute right-0 mt-2 w-48 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/5 transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" aria-hidden="true" />
-                      Edit Product
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredProducts.map((product, idx) => (
+              <Card key={product.id || product.$id || `prod-${idx}`} variant="glass" className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
+                    <p className="text-sm text-zinc-400 capitalize">{product.category}</p>
+                  </div>
+                  <div className="relative group">
+                    <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" aria-label="More options">
+                      <MoreVertical className="w-4 h-4 text-zinc-400" aria-hidden="true" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors rounded-b-xl"
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      Delete Product
-                    </button>
+                    <div className="absolute right-0 mt-2 w-48 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/5 transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" aria-hidden="true" />
+                        Edit Product
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors rounded-b-xl"
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        Delete Product
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-400">Price</span>
-                  <span className="flex items-center gap-1 text-white font-bold">
-                    <IndianRupee className="w-3 h-3" aria-hidden="true" />
-                    <span className="tabular-nums">{product.price}</span>
-                    <span className="text-xs text-zinc-500">/{product.unit}</span>
-                  </span>
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">Price</span>
+                    <span className="flex items-center gap-1 text-white font-bold">
+                      <IndianRupee className="w-3 h-3" aria-hidden="true" />
+                      <span className="tabular-nums">{product.price}</span>
+                      <span className="text-xs text-zinc-500">/{product.unit}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">GST Rate</span>
+                    <span className="text-white font-medium tabular-nums">{product.gst_rate}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">Stock</span>
+                    <span className="text-white font-bold tabular-nums">{product.stock} {product.unit}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">Min Level</span>
+                    <span className="text-zinc-500 font-medium tabular-nums">{product.minStock} {product.unit}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-400">GST Rate</span>
-                  <span className="text-white font-medium tabular-nums">{product.gst_rate}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-400">Stock</span>
-                  <span className="text-white font-bold tabular-nums">{product.stock} {product.unit}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-400">Min Level</span>
-                  <span className="text-zinc-500 font-medium tabular-nums">{product.minStock} {product.unit}</span>
-                </div>
-              </div>
 
-              <Badge variant={statusConfig[product.status].color} className="w-full justify-center">
-                {statusConfig[product.status].label}
-              </Badge>
-            </Card>
-          ))}
-        </div>
+                <Badge variant={statusConfig[product.status].color} className="w-full justify-center">
+                  {statusConfig[product.status].label}
+                </Badge>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-8 bg-white/5 p-4 rounded-3xl border border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Page</span>
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 font-bold text-sm">
+                {page}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="border border-white/5"
+                onClick={() => {
+                  setPage(p => Math.max(1, p - 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="neutral"
+                size="sm"
+                className="bg-cyan-500 text-white hover:bg-cyan-400 border-none shadow-lg shadow-cyan-500/20"
+                onClick={() => {
+                  setPage(p => p + 1)
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={products.length < limit}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Add/Edit Product Modal */}
@@ -419,15 +494,30 @@ export default function Inventory() {
                 <option value="dozen">Dozen</option>
               </select>
             </div>
-            <Input
-              label="GST Rate (%)"
-              name="gst_rate"
-              type="number"
-              step="0.01"
-              required
-              {...formik.getFieldProps('gst_rate')}
-              error={formik.touched.gst_rate && formik.errors.gst_rate}
-            />
+            <div className="relative">
+              <Input
+                label="GST Rate (%)"
+                name="gst_rate"
+                type="number"
+                step="0.01"
+                required
+                {...formik.getFieldProps('gst_rate')}
+                error={formik.touched.gst_rate && formik.errors.gst_rate}
+              />
+              <button
+                type="button"
+                onClick={handleGSTSuggest}
+                disabled={isSuggesting || !formik.values.name}
+                className="absolute right-2 top-8 p-2 text-purple-400 hover:text-purple-300 disabled:text-zinc-600 disabled:cursor-not-allowed transition-colors"
+                title="AI Smart Suggest"
+              >
+                {isSuggesting ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Stock Levels */}

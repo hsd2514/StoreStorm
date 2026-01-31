@@ -46,22 +46,31 @@ export default function Modal({
         if (isOpen) {
             document.addEventListener('keydown', handleEscape)
             document.body.style.overflow = 'hidden'
-
-            // Store current focus and focus modal
-            previousFocusRef.current = document.activeElement
-            modalRef.current?.focus()
         }
 
         return () => {
             document.removeEventListener('keydown', handleEscape)
             document.body.style.overflow = 'unset'
-
-            // Restore focus
-            if (previousFocusRef.current) {
-                previousFocusRef.current.focus()
-            }
         }
     }, [isOpen, onClose])
+
+    // Handle focus management (Separate from listeners to prevent re-triggering on onClose change)
+    useEffect(() => {
+        if (isOpen) {
+            previousFocusRef.current = document.activeElement
+            // Small delay to ensure the modal is rendered before focusing
+            const timer = setTimeout(() => {
+                modalRef.current?.focus()
+            }, 0)
+            return () => clearTimeout(timer)
+        } else {
+            // Restore focus when closing
+            if (previousFocusRef.current) {
+                previousFocusRef.current.focus()
+                previousFocusRef.current = null
+            }
+        }
+    }, [isOpen])
 
     if (!isOpen) return null
 

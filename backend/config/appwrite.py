@@ -1,5 +1,6 @@
 from appwrite.client import Client
 from appwrite.services.databases import Databases
+from appwrite.services.tables_db import TablesDB
 from appwrite.services.storage import Storage
 from appwrite.services.users import Users
 import os
@@ -18,6 +19,7 @@ client.set_key(os.getenv('APPWRITE_API_KEY', ''))
 
 # Initialize services
 databases = Databases(client)
+tables_db = TablesDB(client)
 storage = Storage(client)
 users = Users(client)
 

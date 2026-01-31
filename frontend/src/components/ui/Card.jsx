@@ -17,7 +17,6 @@ export default function Card({
     const variants = {
         glass: `
       bg-white/5
-      backdrop-blur-xl
       border border-white/10
     `,
         elevated: `
@@ -37,8 +36,8 @@ export default function Card({
         <div
             className={cn(
                 'rounded-2xl p-6',
-                'transition-all duration-200',
-                hover && 'hover:bg-white/[0.03] cursor-pointer',
+                'transition-[background-color,transform,border-color,box-shadow] duration-200',
+                hover && 'hover:bg-white/[0.08] hover:scale-[1.02] cursor-pointer',
                 variants[variant],
                 className
             )}

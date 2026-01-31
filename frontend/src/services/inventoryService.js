@@ -8,7 +8,7 @@ export const inventoryService = {
     const queryParams = new URLSearchParams(filters).toString();
     const endpoint = `/inventory/${queryParams ? `?${queryParams}` : ''}`;
     const result = await api(endpoint);
-    return result.inventory;
+    return result?.inventory || [];
   },
 
   /**

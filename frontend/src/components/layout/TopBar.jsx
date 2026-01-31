@@ -102,7 +102,8 @@ export default function TopBar() {
       <div className="flex-1 max-w-lg">
         <button 
           onClick={() => setIsSearchOpen(true)}
-          className="flex items-center w-full gap-4 px-5 py-3 text-sm text-zinc-400 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-2xl transition-all group"
+          aria-label="Search items"
+          className="flex items-center w-full gap-4 px-5 py-3 text-sm text-zinc-400 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-2xl transition-[background-color,border-color] group"
         >
           <Search className="w-4 h-4 text-zinc-500 group-hover:text-purple-400 transition-colors" />
           <span className="font-medium italic opacity-60">Search for orders, products or customers...</span>
@@ -119,8 +120,9 @@ export default function TopBar() {
         <div className="relative" ref={notifRef}>
           <button 
             onClick={() => setIsNotifOpen(!isNotifOpen)}
+            aria-label="Toggle notifications"
             className={cn(
-              "relative p-3.5 rounded-2xl transition-all border",
+              "relative p-3.5 rounded-2xl transition-[background-color,border-color] border",
               isNotifOpen ? "bg-purple-500/10 border-purple-500/20 text-purple-400" : "text-zinc-400 hover:text-white bg-white/5 border-transparent hover:border-white/10"
             )}
           >
@@ -190,6 +192,7 @@ export default function TopBar() {
               <input
                 autoFocus
                 type="text"
+                aria-label="Global search"
                 placeholder="Type to search anything..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

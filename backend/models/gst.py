@@ -9,8 +9,8 @@ class GSTReport(BaseModel):
     total_sales: float
     total_gst: float
     breakdown: Dict[str, float] # e.g. {"0": 100, "5": 50, ...}
-    report_data: Dict[str, Any] # Detailed layout
-    generated_at: datetime = Field(default_factory=datetime.now)
+    report_data: Optional[Dict[str, Any]] = None # Detailed layout
+    generated_at: Optional[datetime] = None
     created_at: Optional[datetime] = Field(None, alias="$createdAt")
     updated_at: Optional[datetime] = Field(None, alias="$updatedAt")
 

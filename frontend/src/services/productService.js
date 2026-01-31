@@ -8,7 +8,7 @@ export const productService = {
     const queryParams = new URLSearchParams(filters).toString();
     const endpoint = `/products/${queryParams ? `?${queryParams}` : ''}`;
     const result = await api(endpoint);
-    return result.products;
+    return result?.products || [];
   },
 
   /**

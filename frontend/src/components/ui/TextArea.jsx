@@ -2,25 +2,17 @@ import { cn } from '../../lib/utils'
 import { forwardRef, useId } from 'react'
 
 /**
- * Reusable Input component following design system
- * @param {string} label - Input label
- * @param {string} error - Error message
- * @param {string} helperText - Helper text below input
- * @param {React.ReactNode} leftIcon - Icon on the left
- * @param {React.ReactNode} rightIcon - Icon on the right
- * @param {string} className - Additional classes for input
- * @param {string} wrapperClassName - Additional classes for wrapper
+ * Reusable TextArea component following design system
  */
-const Input = forwardRef(({
+const TextArea = forwardRef(({
     label,
     error,
     helperText,
-    leftIcon,
-    rightIcon,
     className,
     wrapperClassName,
     id,
     required,
+    rows = 4,
     ...props
 }, ref) => {
     const generatedId = useId()
@@ -39,15 +31,10 @@ const Input = forwardRef(({
             )}
 
             <div className="relative">
-                {leftIcon && (
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                        {leftIcon}
-                    </div>
-                )}
-
-                <input
+                <textarea
                     ref={ref}
                     id={inputId}
+                    rows={rows}
                     required={required}
                     className={cn(
                         'w-full px-4 py-3',
@@ -59,20 +46,12 @@ const Input = forwardRef(({
                         'text-white',
                         'placeholder-zinc-500',
                         'transition-colors duration-200',
-                        'outline-none',
+                        'outline-none resize-none',
                         error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
-                        leftIcon && 'pl-11',
-                        rightIcon && 'pr-11',
                         className
                     )}
                     {...props}
                 />
-
-                {rightIcon && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                        {rightIcon}
-                    </div>
-                )}
             </div>
 
             {error && (
@@ -90,6 +69,6 @@ const Input = forwardRef(({
     )
 })
 
-Input.displayName = 'Input'
+TextArea.displayName = 'TextArea'
 
-export default Input
+export default TextArea

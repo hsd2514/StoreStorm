@@ -20,16 +20,19 @@ import {
   Trash2,
   ShoppingCart,
   ChevronRight,
-  Minus
+  Minus,
+  Wand2,
+  Sparkles
 } from 'lucide-react'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
 import DashboardLayout from '../components/layout/DashboardLayout'
 import { cn } from '../lib/utils'
-import { Badge, Button, Input, Modal, ModalFooter, LoadingSpinner, EmptyState } from '../components/ui'
+import { Badge, Button, Input, Select, TextArea, Modal, ModalFooter, LoadingSpinner, EmptyState, Card } from '../components/ui'
 import { orderService } from '../services/orderService'
 import { customerService } from '../services/customerService'
 import { productService } from '../services/productService'
+import { aiService } from '../services/aiService'
 import { useShop } from '../context/ShopContext'
 
 const statusConfig = {
@@ -49,23 +52,38 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [error, setError] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  
+  // Pagination State
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [totalOrders, setTotalOrders] = useState(0)
 
   // Create Order Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [productSearch, setProductSearch] = useState('')
+  
+  // AI Order Parser State
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false)
+  const [aiText, setAiText] = useState('')
+  const [isParsing, setIsParsing] = useState(false)
 
   const fetchOrders = async () => {
     if (!shop?.id) return
     try {
       setLoading(true)
-      const filters = { shop_id: shop.id }
+      const filters = { 
+        shop_id: shop.id,
+        skip: (page - 1) * limit,
+        limit: limit
+      }
       if (statusFilter !== 'all') {
         filters.status = statusFilter
       }
-      const fetchedOrders = await orderService.list(filters)
+      const fetchedOrders = await orderService.list(filters) || []
       setOrders(fetchedOrders)
+      setTotalOrders(fetchedOrders.length)
     } catch (err) {
       console.error('Failed to fetch orders:', err)
       setError('Failed to load orders')
@@ -76,7 +94,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders()
-  }, [shop?.id, statusFilter])
+  }, [shop?.id, statusFilter, page])
 
   const loadResources = async () => {
     if (!shop?.id) return
@@ -85,8 +103,8 @@ export default function Orders() {
         customerService.list({ shop_id: shop.id }),
         productService.list({ shop_id: shop.id })
       ])
-      setCustomers(featCustomers)
-      setProducts(featProducts)
+      setCustomers(featCustomers || [])
+      setProducts(featProducts || [])
     } catch (err) {
       console.error('Failed to load resources:', err)
     }
@@ -149,6 +167,66 @@ export default function Orders() {
       }
     }
   })
+
+  const handleAIParse = async () => {
+    if (!aiText.trim()) return
+    
+    try {
+      setIsParsing(true)
+      const result = await aiService.parseOrder(aiText, shop.id)
+      
+      if (result.success && result.parsed_order) {
+        const { items: parsedItems, customer_name, delivery_address, notes } = result.parsed_order
+        
+        // Map parsed items to available products
+        const orderItems = []
+        for (const item of parsedItems) {
+          const product = products.find(p => 
+            p.name.toLowerCase() === item.product_name.toLowerCase() ||
+            p.name.toLowerCase().includes(item.product_name.toLowerCase())
+          )
+          
+          if (product) {
+            orderItems.push({
+              product_id: product.id,
+              product_name: product.name,
+              price: product.price,
+              unit: product.unit,
+              quantity: item.quantity,
+              total: product.price * item.quantity
+            })
+          }
+        }
+        
+        // Update Formik
+        orderFormik.setValues({
+          ...orderFormik.values,
+          items: orderItems,
+          delivery_address: delivery_address || orderFormik.values.delivery_address,
+          notes: notes || orderFormik.values.notes
+        })
+        
+        // Try to find customer
+        if (customer_name) {
+          const customer = customers.find(c => 
+            c.name.toLowerCase().includes(customer_name.toLowerCase())
+          )
+          if (customer) {
+            orderFormik.setFieldValue('customer_id', customer.id)
+          }
+        }
+        
+        setIsAIModalOpen(false)
+        setAiText('')
+        setIsCreateOpen(true) // Open the manual order modal to review
+      }
+    } catch (err) {
+      console.error('AI Parse Error:', err)
+      alert('Failed to parse order: ' + err.message)
+    } finally {
+      setIsParsing(false)
+    }
+  }
 
   const addItemToOrder = (product) => {
     const existingIndex = orderFormik.values.items.findIndex(i => i.product_id === product.id)
@@ -224,16 +302,25 @@ export default function Orders() {
           <h1 className="text-3xl font-bold text-white">Orders</h1>
           <p className="mt-1 text-zinc-400">Manage customer orders and fulfillment</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => {
-            loadResources()
-            setIsCreateOpen(true)
-          }}
-        >
-          <Plus className="w-4 h-4" aria-hidden="true" />
-          New Order
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            className="hidden md:flex items-center gap-2 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20"
+            onClick={() => setIsAIModalOpen(true)}
+          >
+            <Wand2 className="w-4 h-4" />
+            AI Parser
+          </Button>
+          <Button 
+            className="flex items-center gap-2"
+            onClick={() => {
+              loadResources()
+              setIsCreateOpen(true)
+            }}
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            New Order
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -281,11 +368,11 @@ export default function Orders() {
         />
       ) : (
         <div className="grid gap-4">
-          {filteredOrders.map(order => {
+          {filteredOrders.map((order, idx) => {
             const StatusIcon = statusConfig[order.status]?.icon || Package
             return (
               <div
-                key={order.id}
+                key={order.id || order.$id || `order-${order.order_number}-${idx}`}
                 onClick={() => setSelectedOrder(order)}
                 className="glass p-6 rounded-2xl hover:bg-white/[0.03] transition-all cursor-pointer"
               >
@@ -318,6 +405,42 @@ export default function Orders() {
               </div>
             )
           })}
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-6 bg-white/5 p-4 rounded-2xl border border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Page</span>
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 font-bold text-sm">
+                {page}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="border border-white/5 hover:border-white/20"
+                onClick={() => {
+                  setPage(p => Math.max(1, p - 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="neutral"
+                size="sm"
+                className="bg-purple-500 text-white hover:bg-purple-400 border-none shadow-lg shadow-purple-500/20"
+                onClick={() => {
+                  setPage(p => p + 1)
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={orders.length < limit}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -349,7 +472,7 @@ export default function Orders() {
               <h4 className="text-sm font-semibold text-white mb-3">Order Items</h4>
               <div className="space-y-2">
                 {selectedOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
+                  <div key={`${selectedOrder.id}-item-${item.product_id || idx}`} className="flex justify-between items-center p-4 bg-white/5 rounded-xl">
                     <div>
                       <p className="font-medium text-white">{item.product_name}</p>
                       <p className="text-xs text-zinc-500">
@@ -413,23 +536,19 @@ export default function Orders() {
             {/* Customer Selection */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="customer_id" className="block text-sm font-medium text-zinc-400 mb-2">
-                  Customer <span className="text-red-400">*</span>
-                </label>
-                <select
+                <Select
+                  label="Customer"
+                  required
                   id="customer_id"
                   name="customer_id"
                   {...orderFormik.getFieldProps('customer_id')}
-                  className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                  error={orderFormik.touched.customer_id && orderFormik.errors.customer_id}
                 >
                   <option value="">Select customer…</option>
                   {customers.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </select>
-                {orderFormik.touched.customer_id && orderFormik.errors.customer_id && (
-                  <p className="mt-1 text-xs text-red-400">{orderFormik.errors.customer_id}</p>
-                )}
+                </Select>
               </div>
 
               <div>
@@ -464,9 +583,9 @@ export default function Orders() {
                 leftIcon={<Search className="w-4 h-4" />}
               />
               <div className="mt-3 max-h-48 overflow-y-auto space-y-2 pr-2">
-                {filteredProducts.map(product => (
+                {filteredProducts.map((product, idx) => (
                   <button
-                    key={product.id}
+                    key={product.id || `prod-${idx}`}
                     type="button"
                     onClick={() => addItemToOrder(product)}
                     className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all group"
@@ -492,8 +611,8 @@ export default function Orders() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {orderFormik.values.items.map(item => (
-                    <div key={item.product_id} className="flex items-center gap-4 p-4 bg-white/5 rounded-xl">
+                  {orderFormik.values.items.map((item, idx) => (
+                    <div key={item.product_id || `cart-${idx}`} className="flex items-center gap-4 p-4 bg-white/5 rounded-xl">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-white">{item.product_name}</p>
                         <p className="text-xs text-zinc-500">₹{item.price}/{item.unit}</p>
@@ -534,34 +653,27 @@ export default function Orders() {
 
             {/* Delivery Address */}
             <div>
-              <label htmlFor="delivery_address" className="block text-sm font-medium text-zinc-400 mb-2">
-                Delivery Address <span className="text-red-400">*</span>
-              </label>
-              <textarea
+              <TextArea
+                label="Delivery Address"
+                required
                 id="delivery_address"
                 name="delivery_address"
                 {...orderFormik.getFieldProps('delivery_address')}
-                rows="2"
+                rows={2}
                 placeholder="Enter delivery address…"
-                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-zinc-500 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
+                error={orderFormik.touched.delivery_address && orderFormik.errors.delivery_address}
               />
-              {orderFormik.touched.delivery_address && orderFormik.errors.delivery_address && (
-                <p className="mt-1 text-xs text-red-400">{orderFormik.errors.delivery_address}</p>
-              )}
             </div>
 
             {/* Notes */}
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-zinc-400 mb-2">
-                Notes (Optional)
-              </label>
-              <textarea
+              <TextArea
+                label="Notes (Optional)"
                 id="notes"
                 name="notes"
                 {...orderFormik.getFieldProps('notes')}
-                rows="2"
+                rows={2}
                 placeholder="Add any special instructions…"
-                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-zinc-500 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
@@ -608,6 +720,54 @@ export default function Orders() {
           </form>
         </Modal>
       )}
+      {/* AI Parser Modal */}
+      <Modal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        title="AI Order Parser"
+        subtitle="Paste WhatsApp or Voice text to create an order"
+      >
+        <div className="p-6 space-y-4">
+          <TextArea
+            label="Order Details"
+            required
+            id="ai-parse-text"
+            className="h-40"
+            autoFocus
+            placeholder={`Example order:
+"I want to order 2kg of Basmati Rice, 1L of Sunflower Oil, and 500g of Tur Dal. 
+Deliver to Flat 402, Sunshine Apartments, Indiranagar. 
+My phone is 9876543210. Delivery tomorrow morning."
+
+Or just paste a WhatsApp message!`}
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+          />
+        </div>
+          
+          <div className="bg-purple-500/5 rounded-2xl p-4 border border-purple-500/10">
+            <div className="flex items-center gap-3 text-purple-400 mb-2">
+              <Sparkles className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Magic Assistant</span>
+            </div>
+            <p className="text-sm text-zinc-400">
+              Paste the customer's message above. I'll find the products, calculate totals, and fill the form for you.
+            </p>
+          </div>
+        
+        <ModalFooter>
+          <Button variant="ghost" onClick={() => setIsAIModalOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleAIParse}
+            disabled={!aiText.trim() || isParsing}
+            className="min-w-[120px]"
+          >
+            {isParsing ? <LoadingSpinner size="sm" className="mr-2" /> : <Wand2 className="w-4 h-4 mr-2" />}
+            {isParsing ? 'Magically Parsing...' : 'Parse Order'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
     </DashboardLayout>
   )
 }

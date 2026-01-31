@@ -5,7 +5,7 @@ Creates database and collections for StoreStorm platform
 import os
 import sys
 from appwrite.client import Client
-from appwrite.services.databases import Databases
+from appwrite.services.tables_db import TablesDB
 from appwrite.id import ID
 from appwrite.exception import AppwriteException
 from dotenv import load_dotenv
@@ -18,7 +18,7 @@ client.set_endpoint(os.getenv('APPWRITE_ENDPOINT'))
 client.set_project(os.getenv('APPWRITE_PROJECT_ID'))
 client.set_key(os.getenv('APPWRITE_API_KEY'))
 
-databases = Databases(client)
+tables_db = TablesDB(client)
 
 # Database configuration
 DATABASE_NAME = 'storestorm_db'
@@ -34,6 +34,8 @@ COLLECTIONS = {
             {'key': 'address', 'type': 'string', 'size': 500, 'required': True},
             {'key': 'category', 'type': 'string', 'size': 100, 'required': False},
             {'key': 'gstin', 'type': 'string', 'size': 15, 'required': False},
+            {'key': 'latitude', 'type': 'double', 'required': False},
+            {'key': 'longitude', 'type': 'double', 'required': False},
             {'key': 'is_active', 'type': 'boolean', 'required': False, 'default': True},
         ],
         'indexes': [
@@ -117,11 +119,17 @@ COLLECTIONS = {
             {'key': 'batch_number', 'type': 'string', 'size': 50, 'required': True},
             {'key': 'driver_name', 'type': 'string', 'size': 255, 'required': False},
             {'key': 'driver_phone', 'type': 'string', 'size': 20, 'required': False},
-            {'key': 'order_ids', 'type': 'string', 'size': 5000, 'required': True},  # JSON array
+            {'key': 'order_ids', 'type': 'string', 'size': 500, 'required': True},  # JSON array
             {'key': 'area', 'type': 'string', 'size': 255, 'required': True},
             {'key': 'status', 'type': 'string', 'size': 50, 'required': True},  # planned, in_progress, completed
             {'key': 'estimated_time', 'type': 'integer', 'required': False},  # minutes
-            {'key': 'route_info', 'type': 'string', 'size': 5000, 'required': False},  # JSON
+            {'key': 'route_info', 'type': 'string', 'size': 500, 'required': False},  # JSON
+            {'key': 'crates', 'type': 'string', 'size': 500, 'required': False},  # JSON
+            {'key': 'capacity_used', 'type': 'integer', 'required': False, 'default': 0},
+            {'key': 'route_stops', 'type': 'string', 'size': 1000, 'required': False},  # JSON
+            {'key': 'route_geometry', 'type': 'string', 'size': 1000, 'required': False},  # JSON
+            {'key': 'total_distance', 'type': 'double', 'required': False},
+            {'key': 'delivery_partner', 'type': 'string', 'size': 500, 'required': False},  # JSON
             {'key': 'started_at', 'type': 'datetime', 'required': False},
             {'key': 'completed_at', 'type': 'datetime', 'required': False},
         ],
@@ -138,8 +146,10 @@ COLLECTIONS = {
             {'key': 'period', 'type': 'string', 'size': 50, 'required': True},  # e.g., "2026-01"
             {'key': 'total_sales', 'type': 'double', 'required': True},
             {'key': 'total_gst', 'type': 'double', 'required': True},
-            {'key': 'breakdown', 'type': 'string', 'size': 5000, 'required': True},  # JSON
+            {'key': 'breakdown', 'type': 'string', 'size': 1000, 'required': True},  # JSON
+            {'key': 'report_data', 'type': 'string', 'size': 1000, 'required': False}, # JSON
             {'key': 'status', 'type': 'string', 'size': 50, 'required': True},  # pending, filed
+            {'key': 'generated_at', 'type': 'datetime', 'required': False},
             {'key': 'filed_at', 'type': 'datetime', 'required': False},
         ],
         'indexes': [
@@ -154,7 +164,7 @@ def create_database():
     """Create the main database"""
     try:
         # Try to create database
-        database = databases.create(
+        database = tables_db.create(
             database_id=ID.unique(),
             name=DATABASE_NAME
         )
@@ -166,7 +176,7 @@ def create_database():
             print(f"⚠️  Database '{DATABASE_NAME}' already exists. Using existing database.")
             # List databases to find the ID
             try:
-                db_list = databases.list()
+                db_list = tables_db.list()
                 for db in db_list['databases']:
                     if db['name'] == DATABASE_NAME:
                         return db['$id']
@@ -180,9 +190,9 @@ def create_collection(database_id, collection_id, schema):
     """Create a collection with attributes and indexes"""
     try:
         # Create collection
-        collection = databases.create_collection(
+        collection = tables_db.create_table(
             database_id=database_id,
-            collection_id=collection_id,
+            table_id=collection_id,
             name=schema['name'],
             permissions=[
                 'read("any")',
@@ -200,42 +210,42 @@ def create_collection(database_id, collection_id, schema):
                 key = attr['key']
                 
                 if attr_type == 'string':
-                    databases.create_string_attribute(
+                    tables_db.create_string_column(
                         database_id=database_id,
-                        collection_id=collection_id,
+                        table_id=collection_id,
                         key=key,
                         size=attr['size'],
                         required=attr['required'],
                         default=attr.get('default')
                     )
                 elif attr_type == 'integer':
-                    databases.create_integer_attribute(
+                    tables_db.create_integer_column(
                         database_id=database_id,
-                        collection_id=collection_id,
+                        table_id=collection_id,
                         key=key,
                         required=attr['required'],
                         default=attr.get('default')
                     )
                 elif attr_type == 'double':
-                    databases.create_float_attribute(
+                    tables_db.create_float_column(
                         database_id=database_id,
-                        collection_id=collection_id,
+                        table_id=collection_id,
                         key=key,
                         required=attr['required'],
                         default=attr.get('default')
                     )
                 elif attr_type == 'boolean':
-                    databases.create_boolean_attribute(
+                    tables_db.create_boolean_column(
                         database_id=database_id,
-                        collection_id=collection_id,
+                        table_id=collection_id,
                         key=key,
                         required=attr['required'],
                         default=attr.get('default')
                     )
                 elif attr_type == 'datetime':
-                    databases.create_datetime_attribute(
+                    tables_db.create_datetime_column(
                         database_id=database_id,
-                        collection_id=collection_id,
+                        table_id=collection_id,
                         key=key,
                         required=attr['required']
                     )
@@ -253,12 +263,12 @@ def create_collection(database_id, collection_id, schema):
         # Create indexes
         for idx in schema.get('indexes', []):
             try:
-                databases.create_index(
+                tables_db.create_index(
                     database_id=database_id,
-                    collection_id=collection_id,
+                    table_id=collection_id,
                     key=idx['key'],
                     type=idx['type'],
-                    attributes=idx['attributes']
+                    columns=idx['attributes']
                 )
                 print(f"    • Added index: {idx['key']}")
             except AppwriteException as e:
@@ -290,39 +300,59 @@ def main():
         with open(env_path, 'r') as f:
             env_content = f.read()
         
-        # Replace placeholder with actual database_id
-        env_content = env_content.replace(
-            'APPWRITE_DATABASE_ID=your_database_id_here',
-            f'APPWRITE_DATABASE_ID={database_id}'
+        # Replace existing DATABASE_ID with new one
+        import re
+        env_content = re.sub(
+            r'APPWRITE_DATABASE_ID=.*',
+            f'APPWRITE_DATABASE_ID={database_id}',
+            env_content
         )
         
         with open(env_path, 'w') as f:
             f.write(env_content)
         
-        print(f"\n✅ Updated .env with DATABASE_ID: {database_id}\n")
-    
-    # Create collections
-    print("\n📦 Creating Collections:\n")
-    for collection_id, schema in COLLECTIONS.items():
-        create_collection(database_id, collection_id, schema)
-        print()
-    
+        print(f"\n✅ Updated backend .env with DATABASE_ID: {database_id}")
+
+    # Update frontend .env if it exists
+    frontend_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', '.env')
+    if os.path.exists(frontend_env_path):
+        with open(frontend_env_path, 'r') as f:
+            f_env_content = f.read()
+        
+        import re
+        f_env_content = re.sub(
+            r'VITE_APPWRITE_DATABASE_ID=.*',
+            f'VITE_APPWRITE_DATABASE_ID={database_id}',
+            f_env_content
+        )
+        
+        with open(frontend_env_path, 'w') as f:
+            f.write(f_env_content)
+        print(f"✅ Updated frontend .env with DATABASE_ID: {database_id}")
+
     # Update config file
     config_path = os.path.join(os.path.dirname(__file__), 'config', 'appwrite.py')
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             config_content = f.read()
         
-        # Update DATABASE_ID
         import re
+        # Support both '' and specific IDs in the regex
         config_content = re.sub(
-            r"DATABASE_ID = os\.getenv\('APPWRITE_DATABASE_ID', ''\)",
+            r"DATABASE_ID = os\.getenv\('APPWRITE_DATABASE_ID', '.*'\)",
             f"DATABASE_ID = os.getenv('APPWRITE_DATABASE_ID', '{database_id}')",
             config_content
         )
         
         with open(config_path, 'w') as f:
             f.write(config_content)
+        print(f"✅ Updated config/appwrite.py with DATABASE_ID: {database_id}")
+    
+    # Create collections
+    print("\n📦 Creating Collections:\n")
+    for collection_id, schema in COLLECTIONS.items():
+        create_collection(database_id, collection_id, schema)
+        print()
     
     print("\n" + "="*60)
     print("✅ Database Setup Complete!")
@@ -334,6 +364,3 @@ def main():
         print(f"  • {coll_id}")
     print("\n🎉 You're all set! Start building your features.\n")
 
-
-if __name__ == "__main__":
-    main()
